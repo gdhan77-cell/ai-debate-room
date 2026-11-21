@@ -661,7 +661,7 @@ html[data-theme="dark"] [data-mc="gem"]{--mc:#9299E8;--mc-soft:#21233A;--mc-line
           <li><b>데모</b> — 키가 없어도 미리 만든 예시 대화로 전체 흐름을 체험합니다. 데모에는 ‘데모’ 표시가 붙습니다.</li>
         </ul>
         <h2>파일 첨부 (TXT·DOCX)</h2>
-        <p>대화창 아래 <b>[📎 파일 첨부 (TXT·DOCX)]</b>를 눌러 원고나 자료를 올리면, 다섯 명이 그 내용까지 읽고 토론합니다. 파일만 올리고 질문을 비워 둔 채 보내기를 눌러도 <b>“첨부한 파일 내용을 검토해 주세요”</b>로 토론이 시작됩니다. 한 번에 5개까지, 전달되는 본문은 모두 합쳐 25,000자까지입니다.</p>
+        <p>대화창 아래 <b>[📎 파일 첨부 (TXT·DOCX)]</b>를 눌러 원고나 자료를 올리면, 다섯 명이 그 내용까지 읽고 토론합니다. 파일만 올리고 질문을 비워 둔 채 보내기를 눌러도 <b>“첨부한 파일 내용을 검토해 주세요”</b>로 토론이 시작됩니다. 한 번에 5개까지, 전달되는 본문은 모두 합쳐 35,000자까지입니다.</p>
         <h2>보관함</h2>
         <p>최종 초안이 나오면 <b>[📄 매뉴얼로 저장]</b>을 누르세요. 질문·결론·근거·주의사항·토론 기록이 한 장의 문서로 묶여 왼쪽 보관함에 쌓이고, .md 파일로도 내려받아집니다.</p>
         <p style="color:var(--ink3)">AI 초안은 틀릴 수 있습니다. 돈·계약·건강처럼 중요한 결정은 원문과 공식 자료를 꼭 확인하세요.</p>
@@ -1607,7 +1607,7 @@ window.AIDJ_DEMO = [
 
     state.mode = decideMode();
     addMsg({ from: 'me', text: question, store: true, files: used.map((f) => ({ name: f.name, chars: f.chars })) });
-    if (att.truncated) addSys('첨부 본문이 25,000자를 넘어 앞부분 ' + att.used.toLocaleString('ko-KR') + '자만 전달합니다(원문 모두 ' + att.total.toLocaleString('ko-KR') + '자). 뒷부분까지 검토하려면 파일을 나누어 올려 주세요.', 'warn');
+    if (att.truncated) addSys('첨부 본문이 35,000자를 넘어 앞부분 ' + att.used.toLocaleString('ko-KR') + '자만 전달합니다(원문 모두 ' + att.total.toLocaleString('ko-KR') + '자). 뒷부분까지 검토하려면 파일을 나누어 올려 주세요.', 'warn');
 
     if (state.mode === 'demo') {
       if (used.length) addSys('지금은 API 키가 없어 데모로 진행합니다. 첨부한 파일 ' + used.length + '개는 실제 AI에게 전달되지 않았습니다. ⚙️ 설정에서 키를 넣으면 파일 내용까지 읽고 토론합니다.', 'warn', { label: '⚙️ 설정 열기', act: 'settings' });
@@ -2088,7 +2088,7 @@ window.AIDJ_DEMO = [
   /* ------------------------------------------------------------------ */
   /* 파일 첨부 (TXT · DOCX)                                              */
   /* ------------------------------------------------------------------ */
-  const ATTACH = { budget: 25000, maxFiles: 5, maxBytes: 20 * 1024 * 1024 };
+  const ATTACH = { budget: 35000, maxFiles: 5, maxBytes: 20 * 1024 * 1024 };
   const DEFAULT_Q = '첨부한 파일 내용을 검토해 주세요.';
   let files = [];
 
@@ -2195,7 +2195,7 @@ window.AIDJ_DEMO = [
     return text;
   }
 
-  /* 질문 + 첨부 본문 → AI에 보낼 글 (본문 상한 25,000자) */
+  /* 질문 + 첨부 본문 → AI에 보낼 글 (본문 상한 35,000자) */
   function attachmentBlock(question, list) {
     if (!list || !list.length) return { text: question, used: 0, total: 0, truncated: false };
     let left = ATTACH.budget;
@@ -2205,7 +2205,7 @@ window.AIDJ_DEMO = [
       const body = f.text || '';
       const head = '--- 파일 ' + (i + 1) + ': ' + f.name + ' ---';
       if (left <= 0) {
-        parts.push(head + '\n(25,000자 상한에 걸려 이 파일의 본문은 넣지 않았습니다. 원문 ' + body.length.toLocaleString('ko-KR') + '자)');
+        parts.push(head + '\n(35,000자 상한에 걸려 이 파일의 본문은 넣지 않았습니다. 원문 ' + body.length.toLocaleString('ko-KR') + '자)');
         return;
       }
       if (body.length > left) {
@@ -2239,7 +2239,7 @@ window.AIDJ_DEMO = [
     });
     const hint = $('attachHint');
     if (files.length) {
-      hint.textContent = '첨부 ' + files.length + '개 · ' + total.toLocaleString('ko-KR') + '자' + (total > ATTACH.budget ? ' · 25,000자까지만 전달' : '');
+      hint.textContent = '첨부 ' + files.length + '개 · ' + total.toLocaleString('ko-KR') + '자' + (total > ATTACH.budget ? ' · 35,000자까지만 전달' : '');
     } else {
       hint.textContent = 'TXT·DOCX 파일을 올리면 AI가 함께 읽습니다';
     }
