@@ -1,0 +1,2490 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F1EDE5">
+<title>AI 대장 단톡방 · 토론실</title>
+<meta name="description" content="클로드 대장, 연과장, 챗주임, 퍼대리, 제미니 팀원이 한 방에서 3라운드로 토론하고 최종 답변 초안과 매뉴얼을 만들어 주는 단톡방입니다.">
+<style>/* ===== AI 대장 단톡방 · 토론실 ===== */
+:root{
+  --scale:1;
+  --bg:#F1EDE5;
+  --panel:#FFFFFF;
+  --panel2:#F8F5EE;
+  --ink:#26201A;
+  --ink2:#6E655A;
+  --ink3:#9A9184;
+  --line:#E3DCCF;
+  --line2:#EFE9DE;
+  --accent:#A8542F;
+  --accent-soft:#F6E6DC;
+  --user-bg:#FEE500;
+  --user-ink:#2A2416;
+  --final-bg:#FFF7D6;
+  --final-line:#E7C25C;
+  --final-ink:#3B2F0E;
+  --ok:#2E8B6E;
+  --warn:#B4552A;
+  --shadow:0 1px 2px rgba(60,45,25,.06),0 8px 24px rgba(60,45,25,.07);
+  --radius:16px;
+  --font: system-ui,-apple-system,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic','맑은 고딕',sans-serif;
+  --mono: ui-monospace,SFMono-Regular,Menlo,Consolas,'D2Coding',monospace;
+}
+html[data-theme="dark"]{
+  --bg:#12100D;
+  --panel:#1C1915;
+  --panel2:#221E19;
+  --ink:#EEE7DB;
+  --ink2:#A79C8C;
+  --ink3:#7C7264;
+  --line:#332C24;
+  --line2:#2A241D;
+  --accent:#D9906A;
+  --accent-soft:#33251D;
+  --user-bg:#E8C761;
+  --user-ink:#241F10;
+  --final-bg:#33290F;
+  --final-line:#7E6423;
+  --final-ink:#F6E6B4;
+  --ok:#5FB394;
+  --warn:#E09067;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html{font-size:calc(16px * var(--scale));-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);
+  line-height:1.62;letter-spacing:-.01em;overflow:hidden;
+}
+button{font-family:inherit;color:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit;color:inherit;font-size:1rem}
+::selection{background:#F3D9A8;color:#2A2416}
+
+/* ---------- layout ---------- */
+.app{
+  display:grid;grid-template-columns:300px minmax(0,1fr);
+  height:100vh;height:100dvh;width:100%;
+}
+.room{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--bg);position:relative}
+.chat-wrap{flex:1;min-height:0;display:flex;justify-content:center;overflow:hidden}
+.chat{
+  width:100%;max-width:900px;overflow-y:auto;overflow-x:hidden;
+  padding:1.25rem 1.25rem 1rem;display:flex;flex-direction:column;gap:.15rem;
+  scroll-behavior:smooth;overscroll-behavior:contain;
+}
+
+/* ---------- drawer ---------- */
+.drawer{
+  background:var(--panel2);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;min-height:0;z-index:40;
+}
+.drawer-head{display:flex;align-items:center;gap:.5rem;padding:1rem 1rem .5rem}
+.drawer-head h2{font-size:1.02rem;margin:0;font-weight:800;letter-spacing:-.02em;flex:1}
+.drawer-hint{font-size:.76rem;color:var(--ink3);padding:0 1rem .75rem;line-height:1.5}
+.manual-list{flex:1;overflow-y:auto;padding:.25rem .75rem 1.5rem;display:flex;flex-direction:column;gap:.5rem}
+.manual-empty{border:1px dashed var(--line);border-radius:14px;padding:1.1rem;font-size:.84rem;color:var(--ink3);text-align:center;line-height:1.6}
+.manual-item{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:.7rem .8rem;display:flex;flex-direction:column;gap:.35rem;transition:border-color .15s}
+.manual-item:hover{border-color:var(--accent)}
+.manual-item .mi-title{font-size:.88rem;font-weight:700;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.manual-item .mi-meta{font-size:.72rem;color:var(--ink3);display:flex;gap:.4rem;align-items:center}
+.manual-item .mi-actions{display:flex;gap:.3rem;margin-top:.15rem}
+.scrim{position:fixed;inset:0;background:rgba(20,15,8,.45);z-index:35;border:0;padding:0}
+
+/* ---------- header ---------- */
+.room-head{
+  background:var(--panel);border-bottom:1px solid var(--line);
+  padding:.7rem 1rem .6rem;position:relative;z-index:10;flex:none;
+  box-shadow:0 1px 0 rgba(60,45,25,.03);
+}
+.head-top{display:flex;align-items:center;gap:.6rem;max-width:900px;margin:0 auto}
+.room-id{flex:1;min-width:0}
+.room-name{font-weight:800;font-size:1.02rem;letter-spacing:-.03em;display:flex;align-items:center;gap:.4rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.room-sub{font-size:.74rem;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.head-actions{display:flex;gap:.25rem;align-items:center}
+.icon-btn{
+  width:2.3rem;height:2.3rem;border-radius:12px;border:1px solid transparent;background:transparent;
+  font-size:1rem;display:inline-flex;align-items:center;justify-content:center;transition:background .15s;
+}
+.icon-btn:hover{background:var(--panel2);border-color:var(--line)}
+.icon-btn.only-desktop{display:none}
+.icon-btn.only-mobile{display:none}
+
+.chip-demo{
+  font-size:.66rem;font-weight:800;letter-spacing:0;color:#7A4A12;background:#FFE29A;
+  border:1px solid #E9C05A;border-radius:999px;padding:.1rem .45rem;vertical-align:middle;
+}
+html[data-theme="dark"] .chip-demo{color:#2A1F08;background:#E3BE5E;border-color:#B99437}
+
+/* roster */
+.roster{display:flex;gap:.4rem;max-width:900px;margin:.55rem auto 0;overflow-x:auto;scrollbar-width:none;padding-bottom:.15rem}
+.roster::-webkit-scrollbar{display:none}
+.member{letter-spacing:-.01em;
+  display:flex;align-items:center;gap:.42rem;border:1px solid var(--line);background:var(--panel2);
+  border-radius:999px;padding:.24rem .6rem .24rem .3rem;flex:none;transition:all .2s;
+}
+.member .m-av{width:1.55rem;height:1.55rem;border-radius:50%;display:grid;place-items:center;font-size:.72rem;font-weight:800;background:var(--mc-soft);color:var(--mc)}
+.member .m-tx{display:flex;flex-direction:column;line-height:1.15}
+.member .m-name{font-size:.76rem;font-weight:700;white-space:nowrap}
+.member .m-role{font-size:.62rem;color:var(--ink3);white-space:nowrap}
+.member.active{border-color:var(--mc);background:var(--mc-soft);box-shadow:0 0 0 2px var(--mc-soft)}
+.member.done .m-name::after{content:" ✓";color:var(--ok);font-size:.7rem}
+
+/* statusbar */
+.statusbar{display:flex;align-items:center;gap:.75rem;max-width:900px;margin:.5rem auto 0;flex-wrap:nowrap}
+.status{display:flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:700;color:var(--ink2);min-width:0;flex:1 1 auto;overflow:hidden}
+#statusText{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status .dot{width:.5rem;height:.5rem;border-radius:50%;background:var(--ink3);flex:none}
+.status.busy .dot{background:var(--accent);animation:pulse 1.1s infinite}
+.status.done .dot{background:var(--ok)}
+.status.demo .dot{background:#D9A227}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}
+.steps{display:flex;gap:.25rem;margin-left:auto;flex:none}
+.step{
+  font-size:.68rem;font-weight:700;color:var(--ink3);border:1px solid var(--line);
+  border-radius:999px;padding:.12rem .5rem;white-space:nowrap;transition:all .2s;
+}
+.step.active{color:#fff;background:var(--accent);border-color:var(--accent)}
+.step.past{color:var(--ok);border-color:var(--ok)}
+html[data-theme="dark"] .step.active{color:#1B1206}
+
+/* ---------- chat bubbles ---------- */
+.dayline{display:flex;justify-content:center;margin:.75rem 0 .5rem}
+.dayline span{font-size:.72rem;color:var(--ink3);background:var(--panel2);border:1px solid var(--line2);border-radius:999px;padding:.15rem .7rem}
+.roundline{display:flex;align-items:center;gap:.6rem;margin:1.1rem 0 .7rem;width:100%}
+.roundline::before,.roundline::after{content:"";height:1px;background:var(--line);flex:1}
+.roundline span{font-size:.72rem;font-weight:800;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:.2rem .75rem;white-space:nowrap;letter-spacing:-.01em}
+html[data-theme="dark"] .roundline span{color:#E6A882}
+
+.msg{display:flex;gap:.55rem;margin:.3rem 0;align-items:flex-start;animation:rise .28s ease-out both;max-width:100%}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.avatar{
+  width:2.4rem;height:2.4rem;border-radius:14px;flex:none;display:grid;place-items:center;
+  font-size:.95rem;font-weight:800;background:var(--mc-soft);color:var(--mc);
+  box-shadow:inset 0 0 0 1px var(--mc-line);margin-top:1.35rem;
+}
+.msg.leader .avatar{background:var(--mc);color:#fff;box-shadow:none}
+.bwrap{min-width:0;max-width:min(80%,40rem);display:flex;flex-direction:column;gap:.18rem}
+.meta{display:flex;align-items:center;gap:.4rem;font-size:.72rem;padding-left:.15rem;flex-wrap:wrap}
+.meta .name{font-weight:800;color:var(--ink)}
+.meta .tag{color:var(--mc,var(--ink3));background:var(--mc-soft,var(--panel2));border-radius:6px;padding:0 .3rem;font-size:.66rem;font-weight:700}
+.meta .time{color:var(--ink3);font-size:.66rem}
+.meta .swap{color:var(--warn);font-size:.66rem;font-weight:700}
+.meta .dmtag{color:#8A5A0B;background:#FFEFC2;border-radius:6px;padding:0 .3rem;font-size:.64rem;font-weight:800}
+html[data-theme="dark"] .meta .dmtag{color:#2A1F08;background:#D8B85A}
+
+.bubble{
+  background:var(--panel);border:1px solid var(--line);border-radius:4px 16px 16px 16px;
+  padding:.62rem .85rem;font-size:.95rem;line-height:1.68;white-space:pre-wrap;overflow-wrap:anywhere;
+  box-shadow:0 1px 1px rgba(60,45,25,.04);
+}
+.msg.leader .bubble{border-left:3px solid var(--mc)}
+.msg.leader .bubble b,.bubble strong{font-weight:800}
+.bubble h4{margin:.1rem 0 .3rem;font-size:.95rem;font-weight:800}
+.bubble .h{font-weight:800;display:block;margin:.5rem 0 .1rem;color:var(--accent)}
+html[data-theme="dark"] .bubble .h{color:#E6A882}
+
+/* user */
+.msg.me{justify-content:flex-end}
+.msg.me .bwrap{max-width:min(82%,36rem);align-items:flex-end}
+.msg.me .meta{justify-content:flex-end}
+.msg.me .bubble{background:var(--user-bg);color:var(--user-ink);border:0;border-radius:16px 4px 16px 16px;font-weight:600;box-shadow:0 1px 2px rgba(90,70,10,.14)}
+
+/* system notice */
+.sys{align-self:center;margin:.6rem 0;max-width:92%}
+.sys span{
+  display:block;text-align:center;font-size:.76rem;color:var(--ink2);background:var(--panel2);
+  border:1px solid var(--line2);border-radius:12px;padding:.4rem .8rem;line-height:1.55;
+}
+.sys.warn span{color:var(--warn);border-color:#E7C3AA;background:#FBEFE6}
+html[data-theme="dark"] .sys.warn span{background:#2C1E15;border-color:#5A3A24}
+
+/* typing */
+.typing{display:inline-flex;gap:.25rem;align-items:center;padding:.25rem 0}
+.typing i{width:.42rem;height:.42rem;border-radius:50%;background:var(--ink3);display:block;animation:blink 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.15s}
+.typing i:nth-child(3){animation-delay:.3s}
+@keyframes blink{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
+
+/* ---------- final card ---------- */
+.final{
+  background:var(--final-bg);border:1px solid var(--final-line);border-radius:16px;
+  padding:.85rem .95rem;color:var(--final-ink);box-shadow:var(--shadow);max-width:100%;
+}
+.final-head{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap}
+.final-head .fh-t{font-weight:900;font-size:.95rem;letter-spacing:-.02em;display:flex;align-items:center;gap:.35rem}
+.final-head .fh-b{font-size:.66rem;font-weight:800;background:#2F7D5C;color:#fff;border-radius:999px;padding:.1rem .5rem}
+.final-head .fh-m{margin-left:auto;font-size:.68rem;color:#8A7024}
+.final-head .btn.small{margin-left:auto;padding:.2rem .5rem}
+.final-head .btn.small + .fh-m{margin-left:.35rem}
+.final-body{font-size:.93rem;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;max-height:none}
+.final-body .h{display:block;font-weight:900;margin:.5rem 0 .1rem;line-height:1.45;color:#7A5A0C}
+html[data-theme="dark"] .final-body .h{color:#E9C878}
+.final-actions{display:flex;gap:.45rem;margin-top:.75rem;flex-wrap:wrap}
+.btn{
+  border:1px solid var(--line);background:var(--panel);border-radius:11px;padding:.45rem .8rem;
+  font-size:.82rem;font-weight:700;display:inline-flex;align-items:center;gap:.35rem;transition:all .15s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:#2C2418;color:#FFF7E2;border-color:#2C2418}
+.btn.primary:hover{background:#43371F;color:#FFF7E2}
+html[data-theme="dark"] .btn.primary{background:#E4C568;color:#241D0C;border-color:#E4C568}
+html[data-theme="dark"] .btn.primary:hover{background:#F0D57F;color:#241D0C}
+.btn.ghost{background:transparent}
+.btn.small{padding:.25rem .5rem;font-size:.72rem;border-radius:9px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.final-note{font-size:.7rem;color:#8A7024;margin-top:.55rem;line-height:1.5;border-top:1px dashed var(--final-line);padding-top:.45rem}
+
+/* ---------- composer ---------- */
+.composer{
+  flex:none;background:var(--panel);border-top:1px solid var(--line);
+  padding:.6rem 1rem calc(.6rem + env(safe-area-inset-bottom));position:relative;z-index:9;
+}
+.composer-in{max-width:900px;margin:0 auto}
+.chips{display:flex;gap:.35rem;margin-bottom:.5rem;overflow-x:auto;scrollbar-width:none;padding-bottom:.1rem}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:none;font-size:.74rem;border:1px solid var(--line);background:var(--panel2);border-radius:999px;
+  padding:.3rem .65rem;color:var(--ink2);transition:all .15s;white-space:nowrap;max-width:16rem;overflow:hidden;text-overflow:ellipsis;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.input-row{display:flex;gap:.45rem;align-items:flex-end;background:var(--panel2);border:1px solid var(--line);border-radius:16px;padding:.35rem .35rem .35rem .8rem;transition:border-color .15s}
+.input-row:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+#input{
+  flex:1;border:0;background:transparent;resize:none;padding:.45rem 0;max-height:6.5rem;
+  line-height:1.55;font-size:.95rem;outline:none;min-height:1.6rem;
+}
+#input::placeholder{color:var(--ink3)}
+.send{
+  border:0;background:#2C2418;color:#FFF7E2;border-radius:12px;padding:.55rem .85rem;
+  font-weight:800;font-size:.85rem;flex:none;transition:all .15s;
+}
+.send:hover{background:#43371F}
+.send:disabled{opacity:.45;cursor:not-allowed}
+html[data-theme="dark"] .send{background:#E4C568;color:#241D0C}
+.stop{border:1px solid #D08B62;background:#FBEEE4;color:#A0461B;border-radius:12px;padding:.5rem .8rem;font-weight:800;font-size:.82rem;flex:none}
+html[data-theme="dark"] .stop{background:#33200F;color:#F0B58C;border-color:#6B4526}
+.composer-foot{display:flex;align-items:center;gap:.75rem;margin-top:.45rem;flex-wrap:wrap}
+.linkbtn{border:0;background:transparent;color:var(--accent);font-size:.78rem;font-weight:800;padding:.1rem 0;text-decoration:underline;text-underline-offset:3px}
+.mode-note{font-size:.7rem;color:var(--ink3);margin-left:auto;text-align:right;line-height:1.4}
+
+/* ---------- 파일 첨부 ---------- */
+.attach-row{display:flex;align-items:center;gap:.6rem;margin-top:.45rem;flex-wrap:wrap}
+.attach-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.4rem;flex:none;
+  border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:12px;
+  padding:.55rem .9rem;font-size:.88rem;font-weight:800;min-height:2.8rem;line-height:1.2;
+  transition:all .15s;
+}
+.attach-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.attach-btn:active{transform:translateY(1px)}
+.attach-hint{font-size:.72rem;color:var(--ink3);line-height:1.45;flex:1 1 8rem;min-width:0}
+.attach-list{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.45rem}
+.attach-list[hidden]{display:none}
+.file-chip{
+  display:flex;align-items:center;gap:.45rem;background:var(--panel2);border:1px solid var(--line);
+  border-radius:12px;padding:.3rem .4rem .3rem .6rem;font-size:.82rem;min-height:2.55rem;
+}
+.file-chip .fc-name{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(50vw,22rem)}
+.file-chip .fc-meta{font-size:.7rem;color:var(--ink3);flex:none}
+.file-chip .fc-x{
+  margin-left:auto;flex:none;width:2rem;height:2rem;border-radius:9px;border:1px solid var(--line);
+  background:var(--panel);color:var(--ink2);font-size:.8rem;display:grid;place-items:center;line-height:1;
+}
+.file-chip .fc-x:hover{border-color:var(--warn);color:var(--warn)}
+.att-badges{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.3rem;justify-content:flex-end}
+.att-badge{
+  display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;font-weight:800;
+  background:var(--panel2);border:1px solid var(--line);color:var(--ink2);
+  border-radius:999px;padding:.15rem .55rem;max-width:16rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.att-badge i{font-style:normal;font-weight:600;color:var(--ink3);font-size:.66rem}
+
+/* ---------- modals ---------- */
+.modal{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:1rem;background:rgba(25,18,8,.5);backdrop-filter:blur(2px)}
+.modal[hidden]{display:none}
+.sheet{
+  background:var(--panel);border-radius:20px;width:min(680px,100%);max-height:min(88dvh,900px);
+  display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(20,12,0,.35);overflow:hidden;
+  border:1px solid var(--line);
+}
+.sheet-head{display:flex;align-items:center;gap:.6rem;padding:1rem 1.1rem .8rem;border-bottom:1px solid var(--line2);flex:none}
+.sheet-head h2{font-size:1rem;margin:0;font-weight:900;letter-spacing:-.02em;flex:1}
+.sheet-body{padding:1rem 1.1rem;overflow-y:auto;display:flex;flex-direction:column;gap:1.1rem}
+.sheet-foot{padding:.8rem 1.1rem;border-top:1px solid var(--line2);display:flex;gap:.5rem;justify-content:flex-end;flex:none;background:var(--panel2)}
+.sec-t{font-size:.8rem;font-weight:900;letter-spacing:-.01em;margin:0 0 .45rem;display:flex;align-items:center;gap:.4rem;color:var(--ink)}
+.sec-t small{font-weight:600;color:var(--ink3);font-size:.7rem}
+.field{display:flex;flex-direction:column;gap:.25rem;margin-bottom:.5rem}
+.field label{font-size:.76rem;font-weight:700;color:var(--ink2)}
+.field .row{display:flex;gap:.35rem}
+.field input[type=text],.field input[type=password],.field select{
+  width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:10px;
+  padding:.5rem .6rem;font-size:.86rem;outline:none;transition:border-color .15s;
+}
+.field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field .hint{font-size:.68rem;color:var(--ink3);line-height:1.5}
+.hint{display:block;font-size:.72rem;color:var(--ink3);line-height:1.65;margin:.45rem 0 0}
+.hint b{color:var(--ink2)}
+.hint a{color:var(--accent)}
+#viewBody h1{display:none}
+.field .hint a{color:var(--accent)}
+.keyrow{display:flex;align-items:center;gap:.4rem;border:1px solid var(--line);border-radius:12px;padding:.45rem .55rem;margin-bottom:.45rem;background:var(--panel2);flex-wrap:wrap}
+.keyrow .kr-name{font-size:.78rem;font-weight:800;width:6.2rem;flex:none}
+.keyrow .kr-status{font-size:.68rem;color:var(--ink3);margin-left:auto}
+.keyrow input{flex:1;min-width:8rem;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:.35rem .5rem;font-size:.8rem;outline:none;font-family:var(--mono)}
+.keyrow input:focus{border-color:var(--accent)}
+.toggle{display:flex;align-items:flex-start;gap:.55rem;padding:.5rem .1rem;cursor:pointer}
+.toggle input{appearance:none;width:2.3rem;height:1.3rem;border-radius:999px;background:var(--line);position:relative;flex:none;transition:background .2s;cursor:pointer;margin:.1rem 0 0}
+.toggle input::after{content:"";position:absolute;top:.15rem;left:.15rem;width:1rem;height:1rem;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.toggle input:checked{background:var(--ok)}
+.toggle input:checked::after{transform:translateX(1rem)}
+.toggle .tt{font-size:.82rem;font-weight:700;line-height:1.4}
+.toggle .td{font-size:.7rem;color:var(--ink3);line-height:1.5;display:block;font-weight:500}
+details.adv{border:1px solid var(--line);border-radius:12px;padding:.5rem .7rem;background:var(--panel2)}
+details.adv summary{font-size:.78rem;font-weight:800;cursor:pointer;color:var(--ink2)}
+details.adv .adv-body{padding-top:.6rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.notice{font-size:.72rem;color:var(--ink2);background:var(--panel2);border:1px solid var(--line2);border-radius:12px;padding:.55rem .7rem;line-height:1.6}
+.notice b{color:var(--ink)}
+
+/* manual viewer */
+.md{font-size:.9rem;line-height:1.75;color:var(--ink);overflow-wrap:anywhere}
+.md h1{font-size:1.1rem;margin:0 0 .6rem;letter-spacing:-.02em}
+.md h2{font-size:.96rem;margin:1.1rem 0 .4rem;padding-bottom:.25rem;border-bottom:1px solid var(--line2);letter-spacing:-.01em}
+.md h3{font-size:.9rem;margin:.8rem 0 .3rem}
+.md p{margin:.35rem 0}
+.md ul{margin:.3rem 0;padding-left:1.1rem}
+.md li{margin:.15rem 0}
+.md blockquote{margin:.5rem 0;padding:.4rem .7rem;border-left:3px solid var(--final-line);background:var(--final-bg);color:var(--final-ink);border-radius:0 8px 8px 0}
+.md code{font-family:var(--mono);font-size:.82rem;background:var(--panel2);padding:.05rem .3rem;border-radius:5px}
+.md hr{border:0;border-top:1px solid var(--line);margin:.9rem 0}
+
+/* toast */
+.toast{
+  position:fixed;left:50%;bottom:8.8rem;transform:translateX(-50%) translateY(10px);
+  background:#2C2418;color:#FFF6DE;font-size:.82rem;font-weight:700;padding:.55rem 1rem;border-radius:999px;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:90;opacity:0;transition:all .22s;pointer-events:none;max-width:90vw;text-align:center;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+html[data-theme="dark"] .toast{background:#EFE3C8;color:#241C0C}
+
+/* ---------- responsive ---------- */
+@media (max-width:960px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .drawer{
+    position:fixed;top:0;left:0;bottom:0;width:min(86vw,340px);
+    transform:translateX(-102%);transition:transform .25s ease;box-shadow:12px 0 40px rgba(0,0,0,.2);
+  }
+  .drawer.open{transform:none}
+  .icon-btn.only-mobile{display:inline-flex}
+  .drawer .icon-btn.only-mobile{display:inline-flex}
+  .chat{padding:1rem .75rem .75rem}
+  .composer{padding:.5rem .7rem calc(.5rem + env(safe-area-inset-bottom))}
+  .bwrap{max-width:84%}
+  .avatar{width:2.15rem;height:2.15rem;border-radius:12px;font-size:.85rem;margin-top:1.3rem}
+  .room-head{padding:.5rem .7rem .5rem}
+  .steps{gap:.18rem}
+  .step{font-size:.63rem;padding:.1rem .4rem}
+  .status{font-size:.72rem}
+  .mode-note{width:100%;text-align:left;margin-left:0}
+  .grid2{grid-template-columns:1fr}
+}
+@media (max-width:420px){
+  .room-sub{display:none}
+  .sheet{border-radius:16px;max-height:92dvh}
+  .keyrow .kr-name{width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* ---------- 팀원 색 ---------- */
+[data-mc="leader"]{--mc:#C1663F;--mc-soft:#FAEBE2;--mc-line:#EBC9B4}
+[data-mc="yeonji"]{--mc:#B24C82;--mc-soft:#FAE9F2;--mc-line:#EAC3DA}
+[data-mc="chat"]{--mc:#1C8A6E;--mc-soft:#E4F4EF;--mc-line:#B9DFD3}
+[data-mc="pf"]{--mc:#2C7A9E;--mc-soft:#E6F2F8;--mc-line:#BDDCEA}
+[data-mc="gem"]{--mc:#5560C8;--mc-soft:#EAECFA;--mc-line:#C8CDF2}
+html[data-theme="dark"] [data-mc="leader"]{--mc:#E0946C;--mc-soft:#39251C;--mc-line:#4E3325}
+html[data-theme="dark"] [data-mc="yeonji"]{--mc:#D984B0;--mc-soft:#33202A;--mc-line:#4A2E3B}
+html[data-theme="dark"] [data-mc="chat"]{--mc:#5CC0A1;--mc-soft:#182E28;--mc-line:#26453B}
+html[data-theme="dark"] [data-mc="pf"]{--mc:#6FB3D4;--mc-soft:#17282F;--mc-line:#254049}
+html[data-theme="dark"] [data-mc="gem"]{--mc:#9299E8;--mc-soft:#21233A;--mc-line:#323658}
+
+/* 보정 */
+.scrim[hidden]{display:none}
+.bubble{font-size:1rem}
+.final-body{font-size:.97rem}
+.kr-status{max-width:14rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.md ol{margin:.3rem 0;padding-left:1.35rem}
+.meta{max-width:100%}
+.meta .name{max-width:9.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:420px){.meta .name{max-width:6.2rem}}
+
+@media (max-width:480px){
+  .head-actions{gap:.05rem}
+  .head-actions .icon-btn{width:2rem;height:2rem;font-size:.95rem}
+  .room-name{font-size:.98rem}
+  .room-head{padding:.45rem .55rem .45rem}
+  .composer{padding:.45rem .55rem calc(.45rem + env(safe-area-inset-bottom))}
+  .toast{bottom:12.4rem}
+  .final-head .fh-m{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <aside class="drawer" id="drawer" aria-label="매뉴얼 보관함">
+    <div class="drawer-head">
+      <h2>📄 매뉴얼 보관함</h2>
+      <button class="icon-btn only-mobile" id="drawerClose" aria-label="보관함 닫기">✕</button>
+    </div>
+    <div class="drawer-hint">토론이 끝나면 <b>[매뉴얼로 저장]</b>을 눌러 이곳에 쌓아 두세요. 저장한 매뉴얼은 이 브라우저에만 남습니다.</div>
+    <div class="manual-list" id="manualList"></div>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <main class="room">
+    <header class="room-head">
+      <div class="head-top">
+        <button class="icon-btn only-mobile" id="menuBtn" aria-label="보관함 열기">☰</button>
+        <div class="room-id">
+          <div class="room-name">AI 대장 단톡방 <span class="chip-demo" id="demoChip" hidden>데모</span></div>
+          <div class="room-sub" id="roomSub">클로드 대장 · 연과장 · 챗주임 · 퍼대리 · 제미니 팀원 · 5명</div>
+        </div>
+        <div class="head-actions">
+          <button class="icon-btn" id="fontBtn" aria-label="글자 크기" title="글자 크기">가</button>
+          <button class="icon-btn" id="themeBtn" aria-label="테마 전환" title="밝게/어둡게">🌙</button>
+          <button class="icon-btn" id="newBtn" aria-label="새 대화" title="새 대화">＋</button>
+          <button class="icon-btn" id="settingsBtn" aria-label="설정" title="설정 (API 키)">⚙️</button>
+        </div>
+      </div>
+      <div class="roster" id="roster" aria-label="팀원"></div>
+      <div class="statusbar">
+        <div class="status" id="status"><span class="dot"></span><span id="statusText">대기 중</span></div>
+        <div class="steps" id="steps">
+          <span class="step" data-step="1">1라운드 의견</span>
+          <span class="step" data-step="2">2라운드 검토</span>
+          <span class="step" data-step="3">최종 결론</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="chat-wrap">
+      <div class="chat" id="chat" role="log" aria-live="polite" aria-label="토론 대화"></div>
+    </div>
+
+    <div class="composer" id="composer">
+      <div class="composer-in">
+        <div class="chips" id="chips"></div>
+        <div class="attach-list" id="attachList" hidden></div>
+        <div class="input-row">
+          <textarea id="input" rows="1" placeholder="질문을 입력하세요" aria-label="질문 입력"></textarea>
+          <button class="send" id="sendBtn">보내기</button>
+          <button class="stop" id="stopBtn" hidden>중단</button>
+        </div>
+        <div class="attach-row">
+          <button class="attach-btn" id="attachBtn" type="button" aria-describedby="attachHint">📎 파일 첨부 (TXT·DOCX)</button>
+          <input type="file" id="attachInput" accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple hidden>
+          <span class="attach-hint" id="attachHint">TXT·DOCX 파일을 올리면 AI가 함께 읽습니다</span>
+        </div>
+        <div class="composer-foot">
+          <button class="linkbtn" id="demoBtn">▶ 데모 시연해 보기</button>
+          <span class="mode-note" id="modeNote"></span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 설정 -->
+<div class="modal" id="settingsModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="sheet-head">
+      <h2 id="setTitle">⚙️ 설정 — AI 엔진과 운용 방식</h2>
+      <button class="icon-btn" id="setClose" aria-label="닫기">✕</button>
+    </div>
+    <div class="sheet-body">
+      <section>
+        <h3 class="sec-t">1. AI 엔진 키 <small>없어도 데모로 체험할 수 있습니다</small></h3>
+        <div class="keyrow" data-p="anthropic">
+          <span class="kr-name">클로드 (Anthropic)</span>
+          <input type="password" id="key_anthropic" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+          <button class="btn small ghost" data-eye="anthropic">보기</button>
+          <button class="btn small" data-test="anthropic">연결 테스트</button>
+          <span class="kr-status" id="st_anthropic"></span>
+        </div>
+        <div class="keyrow" data-p="openai">
+          <span class="kr-name">챗GPT (OpenAI)</span>
+          <input type="password" id="key_openai" placeholder="sk-…" autocomplete="off" spellcheck="false">
+          <button class="btn small ghost" data-eye="openai">보기</button>
+          <button class="btn small" data-test="openai">연결 테스트</button>
+          <span class="kr-status" id="st_openai"></span>
+        </div>
+        <div class="keyrow" data-p="gemini">
+          <span class="kr-name">제미나이 (Google)</span>
+          <input type="password" id="key_gemini" placeholder="AIza…" autocomplete="off" spellcheck="false">
+          <button class="btn small ghost" data-eye="gemini">보기</button>
+          <button class="btn small" data-test="gemini">연결 테스트</button>
+          <span class="kr-status" id="st_gemini"></span>
+        </div>
+        <div class="keyrow" data-p="perplexity">
+          <span class="kr-name">퍼플렉시티</span>
+          <input type="password" id="key_perplexity" placeholder="pplx-…" autocomplete="off" spellcheck="false">
+          <button class="btn small ghost" data-eye="perplexity">보기</button>
+          <button class="btn small" data-test="perplexity">연결 테스트</button>
+          <span class="kr-status" id="st_perplexity"></span>
+        </div>
+        <p class="hint">
+          키는 <b>이 브라우저(localStorage)에만</b> 저장되고, 대화할 때 해당 회사 서버로 곧바로 전송됩니다. 이 앱을 만든 쪽이나 다른 곳으로는 전송되지 않습니다.
+          공용 컴퓨터에서는 저장하지 마세요. 키 발급: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic</a> ·
+          <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI</a> ·
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> ·
+          <a href="https://www.perplexity.ai/settings/api" target="_blank" rel="noopener">Perplexity</a>
+        </p>
+      </section>
+
+      <section>
+        <h3 class="sec-t">2. 운용 방식</h3>
+        <label class="toggle">
+          <input type="checkbox" id="multiToggle">
+          <span class="tt">키가 1개뿐이어도 5명 역할을 한 엔진이 번갈아 대행 (멀티 페르소나)
+            <span class="td">켜 두면, 가진 키 하나로 1~3라운드 토론 전체를 진행합니다. 끄면 아래 배정대로 4개 회사 엔진을 각각 부릅니다.</span>
+          </span>
+        </label>
+        <div class="grid2">
+          <div class="field">
+            <label for="delegateSel">대행 엔진 (한 엔진이 5역할)</label>
+            <select id="delegateSel">
+              <option value="auto">자동 (가진 키 중 빠른 것)</option>
+              <option value="anthropic">클로드</option>
+              <option value="gemini">제미나이</option>
+              <option value="openai">챗GPT</option>
+              <option value="perplexity">퍼플렉시티</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="yeonjiSel">연과장 담당 엔진 (4키 모드)</label>
+            <select id="yeonjiSel">
+              <option value="auto">자동 (클로드 → 제미나이 순)</option>
+              <option value="gemini">제미나이</option>
+              <option value="anthropic">클로드</option>
+              <option value="openai">챗GPT</option>
+              <option value="perplexity">퍼플렉시티</option>
+            </select>
+          </div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="fallbackToggle">
+          <span class="tt">한 엔진이 실패하면 다른 엔진이 대신 답하기
+            <span class="td">키 오류·한도 초과·브라우저 차단(CORS) 때 토론이 멈추지 않습니다. 대신 답한 경우 말풍선에 ‘대체 엔진’ 표시가 붙습니다.</span>
+          </span>
+        </label>
+      </section>
+
+      <section>
+        <h3 class="sec-t">3. 고급 <small>잘 모르면 그대로 두세요</small></h3>
+        <details class="adv">
+          <summary>모델명 · 중계 서버 주소</summary>
+          <div class="adv-body">
+            <div class="grid2">
+              <div class="field"><label for="model_anthropic">클로드 모델</label><input type="text" id="model_anthropic" spellcheck="false"></div>
+              <div class="field"><label for="model_openai">챗GPT 모델</label><input type="text" id="model_openai" spellcheck="false"></div>
+              <div class="field"><label for="model_gemini">제미나이 모델</label><input type="text" id="model_gemini" spellcheck="false"></div>
+              <div class="field"><label for="model_perplexity">퍼플렉시티 모델</label><input type="text" id="model_perplexity" spellcheck="false"></div>
+            </div>
+            <div class="field">
+              <label for="proxyInput">중계(프록시) 주소 — 선택</label>
+              <input type="text" id="proxyInput" placeholder="https://내-worker.workers.dev" spellcheck="false">
+              <span class="hint">퍼플렉시티·오픈AI는 브라우저에서 직접 호출이 막히는 경우가 있습니다. 그때 이 주소를 넣으면 그 서버를 거쳐 호출합니다. 비워 두면 직접 호출합니다.</span>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section>
+        <h3 class="sec-t">4. 데이터</h3>
+        <div class="btn-row" style="display:flex;gap:.45rem;flex-wrap:wrap">
+          <button class="btn small" id="clearThread">대화 기록 지우기</button>
+          <button class="btn small" id="clearManuals">보관함 비우기</button>
+          <button class="btn small" id="resetSettings">설정 초기화</button>
+        </div>
+        <p class="hint">대화·매뉴얼·설정은 모두 이 브라우저 안에만 저장됩니다. 브라우저 데이터를 지우면 함께 사라집니다.</p>
+      </section>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn ghost" id="setCancel">닫기</button>
+      <button class="btn primary" id="setSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 매뉴얼 보기 -->
+<div class="modal" id="viewModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="viewTitle">
+    <div class="sheet-head">
+      <h2 id="viewTitle">📄 매뉴얼</h2>
+      <button class="icon-btn" id="viewClose" aria-label="닫기">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="md" id="viewBody"></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn ghost" id="viewDelete">삭제</button>
+      <button class="btn" id="viewCopy">복사</button>
+      <button class="btn primary" id="viewDownload">.md 내려받기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 도움말 -->
+<div class="modal" id="helpModal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="sheet-head">
+      <h2 id="helpTitle">💬 이 단톡방 쓰는 법</h2>
+      <button class="icon-btn" id="helpClose" aria-label="닫기">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="md" id="helpBody">
+        <h2>다섯 명이 한 방에서 일합니다</h2>
+        <ul>
+          <li><b>클로드 대장</b> — 동료 답안을 검증하고 틀린 점을 짚은 뒤 최종 답변 초안을 씁니다.</li>
+          <li><b>연과장</b> — 실무·생활 맥락, 빠뜨린 것을 채웁니다.</li>
+          <li><b>챗주임</b> — 질문을 구조화해 1차 초안을 만듭니다.</li>
+          <li><b>퍼대리</b> — 최신 근거·출처·수치를 확인합니다.</li>
+          <li><b>제미니 팀원</b> — 다른 각도, 대안과 반론을 던집니다.</li>
+        </ul>
+        <h2>세 라운드로 진행됩니다</h2>
+        <p>1라운드에서 네 팀원이 각자 답하고, 2라운드에서 대장이 허점과 모순을 짚으면 팀원이 보완합니다. 3라운드에서 대장이 노란 박스에 <b>최종 답변 초안</b>을 올립니다. 복사하거나 매뉴얼로 저장하면 끝입니다.</p>
+        <h2>세 가지 방식으로 돌아갑니다</h2>
+        <ul>
+          <li><b>4개 키 모드</b> — 네 회사 키를 넣으면 각자 자기 엔진으로 답합니다.</li>
+          <li><b>1개 키 대행 모드</b> — 키가 하나만 있어도 그 엔진이 다섯 역할을 번갈아 합니다. (설정에서 켜기)</li>
+          <li><b>데모</b> — 키가 없어도 미리 만든 예시 대화로 전체 흐름을 체험합니다. 데모에는 ‘데모’ 표시가 붙습니다.</li>
+        </ul>
+        <h2>파일 첨부 (TXT·DOCX)</h2>
+        <p>대화창 아래 <b>[📎 파일 첨부 (TXT·DOCX)]</b>를 눌러 원고나 자료를 올리면, 다섯 명이 그 내용까지 읽고 토론합니다. 파일만 올리고 질문을 비워 둔 채 보내기를 눌러도 <b>“첨부한 파일 내용을 검토해 주세요”</b>로 토론이 시작됩니다. 한 번에 5개까지, 전달되는 본문은 모두 합쳐 25,000자까지입니다.</p>
+        <h2>보관함</h2>
+        <p>최종 초안이 나오면 <b>[📄 매뉴얼로 저장]</b>을 누르세요. 질문·결론·근거·주의사항·토론 기록이 한 장의 문서로 묶여 왼쪽 보관함에 쌓이고, .md 파일로도 내려받아집니다.</p>
+        <p style="color:var(--ink3)">AI 초안은 틀릴 수 있습니다. 돈·계약·건강처럼 중요한 결정은 원문과 공식 자료를 꼭 확인하세요.</p>
+      </div>
+    </div>
+    <div class="sheet-foot"><button class="btn primary" id="helpOk">알겠습니다</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>/* 데모 시나리오 — 실제 AI 응답이 아닌 예시 대화 */
+window.AIDJ_DEMO = [
+{
+  id:'class',
+  title:'가을 시, 2시간 낭송 수업안',
+  chip:'가을 시 2시간 수업안',
+  question:'이번 주 토요일 시낭송 수업 2시간 커리큘럼을 짜줘. 수강생 10명, 60~70대, 주제는 가을 시야.',
+  script:[
+    {type:'round', n:1, label:'1라운드 · 개별 의견'},
+    {type:'msg', from:'yeonji', text:`수강생이 10명, 60~70대라면 2시간을 꽉 채우기보다 '몸 풀기 → 한 편 완성 → 짧은 발표'로 잡는 게 안전합니다.
+
+· 0~15분 발성·호흡 워밍업 (앉아서 어깨·목 풀기 포함)
+· 15~45분 시 한 편 함께 읽고 끊어 읽기 표시
+· 45~65분 2인 1조 연습 (서로 들어주기)
+· 65~85분 3명 발표 + 짧은 피드백
+· 85~110분 두 번째 시는 감상만, 다음 주 과제 안내
+
+준비물은 14~16pt 큰 글씨 인쇄본 10부, 물, 마이크 높이 조절, 의자 배치입니다. 중간에 5분 쉬는 시간을 꼭 넣으세요.`},
+    {type:'msg', from:'chat', text:`질문을 네 블록으로 나눠 봤습니다.
+
+1) 목표 — '가을 시 한 편을 자기 목소리로 끝까지 낭송한다'
+2) 도입(15분) — 호흡·발성, 오늘의 시 소개
+3) 전개(60분) — 끊어 읽기 → 2인 연습 → 개별 교정
+4) 정리(25분) — 3명 발표, 다음 주 예고
+
+학습목표는 ①호흡과 끊어 읽기 ②감정의 기복 만들기 ③사람들 앞에서 끝까지 낭송하기, 세 가지로 잡으면 수업 후 평가도 쉬워집니다.`},
+    {type:'msg', from:'pf', text:`근거 확인 결과입니다. (아래는 형식 예시이며, 실제 인용 전 원문 확인이 필요합니다)
+
+· 공개 교육자료들은 시 낭송 수업에서 '호흡·발성 워밍업 10~15분'을 공통으로 언급합니다 — 기관 원문 확인 필요
+· 60대 이상 학습자에게 큰 글씨(14pt 이상) 인쇄와 중간 휴식이 도움이 된다는 일반론이 있습니다 — 구체 수치는 미확인
+· '낭송 속도 1분 200~240자가 듣기 편하다'는 권고가 돌아다니지만 출처가 분명하지 않습니다. 이번 수업안에는 넣지 않는 편이 안전합니다.
+
+확인된 것: 워밍업·큰 글씨 인쇄의 필요성(일반 권고 수준)
+직접 확인할 것: 기관 자료 원문, 실제 수강생 연령대의 집중 시간`},
+    {type:'msg', from:'gem', text:`반대 관점 하나. 2시간에 두 편은 과욕입니다. 60~70대 수강생에게는 한 편을 '완성했다'는 감각이 다음 달 등록을 좌우합니다.
+
+대안 ①한 편만 집중하되 녹음해서 스스로 듣기 ②휴대폰 녹음 파일을 단톡방으로 보내 주기 ③다음 주에 두 번째 시로 확장.
+
+그리고 '3명 발표'는 순서를 미리 정하지 않으면 시간이 새기 쉽습니다. 지원자를 먼저 받으세요.`},
+
+    {type:'round', n:2, label:'2라운드 · 상호 검토'},
+    {type:'msg', from:'leader', text:`1라운드 네 답을 맞춰 보니 세 군데가 어긋납니다.
+
+① 시간 합계 — 연과장 안은 110분으로 2시간에 10분이 남고, 챗주임 안은 100분입니다. 같은 수업안이 두 개입니다.
+② 피드백 계산 — 연과장은 '3명 발표+피드백'을 20분에 넣었지만, 60~70대 수강생은 한 명당 3~5분이 걸립니다. 실제로는 30분 이상 필요합니다. 이게 가장 위험한 계산입니다.
+③ 근거 — 퍼대리가 언급한 '1분 200~240자'는 출처가 불분명합니다. 수업안에서 빼고, 넣으려면 원문을 확인해야 합니다.
+
+연과장은 시간을 다시 계산해 주세요. 제미니는 '한 편 집중'과 '두 편' 중 어느 쪽인지 결론을 내 주세요. 퍼대리는 근거의 신뢰 표시를 정리해 주세요.`},
+    {type:'msg', from:'yeonji', text:`지적대로 고쳤습니다. 120분 기준으로 다시 짰습니다.
+
+· 0~15 발성·호흡
+· 15~40 한 편 끊어 읽기
+· 40~60 2인 연습
+· 60~70 쉬는 시간
+· 70~90 발표 3명 (각 5분) + 짧은 코멘트
+· 90~110 한 편 통째로 함께 낭송
+· 110~120 다음 주 과제·정리
+
+피드백은 발표자 3명에게만 하고, 나머지는 짝 연습에서 미리 받게 했습니다.`},
+    {type:'msg', from:'gem', text:`한 편 집중으로 결론 내립니다. 두 번째 시는 '다음 주 예고'로만 쓰고, 이번 시간에는 같은 시를 세 번(읽기 → 연습 → 발표) 반복하는 편이 완성도가 높습니다. 대신 숙제로 두 번째 시를 녹음해 오게 하면 다음 주로 이어집니다.`},
+    {type:'msg', from:'pf', text:`근거 표시를 정리했습니다.
+
+· 워밍업 10~15분 — 여러 교육 현장 자료에서 공통 언급, 이 자리에서 원문 확인은 못 했습니다(참고 수준)
+· 큰 글씨 인쇄 — 일반 권고로만 표기
+· 200~240자 수치 — 출처 불명, 수업안에서 제외 권장
+
+정리하면 이 수업안은 '경험 기반 설계'이고, 대외에 인용할 수 있는 공식 수치는 없습니다.`},
+
+    {type:'round', n:3, label:'3라운드 · 대장 최종 정리'},
+    {type:'final', from:'leader', text:`## 결론
+2시간은 '가을 시 한 편을 끝까지 낭송하는 시간'으로 잡습니다. 두 번째 시는 다음 주로 넘깁니다.
+
+## 핵심 내용
+1. 목표는 한 편 완성 — 같은 시로 읽기·연습·발표를 세 번 반복합니다.
+2. 시간표(120분): 발성·호흡 15 / 끊어 읽기 25 / 2인 연습 20 / 쉬는 시간 10 / 발표 3명 20 / 함께 낭송 20 / 정리 10
+3. 발표는 지원자 3명, 1인 5분(낭송 3분 + 코멘트 2분). 나머지는 짝 연습에서 미리 피드백을 받습니다.
+4. 준비물: 14~16pt 큰 글씨 인쇄본 10부, 물, 마이크 높이 확인, 의자 반원 배치, 녹음 안내문.
+
+## 실행 순서
+① 전날 인쇄본·명단 확인 → ② 시작할 때 쉬는 시간과 발표 순서를 미리 공지 → ③ 발표는 지원자부터 → ④ 마지막에 전원 함께 낭송 → ⑤ 다음 주 과제(두 번째 시 녹음) 안내
+
+## 출처·근거
+· 워밍업 10~15분, 큰 글씨 인쇄: 교육 현장의 일반 권고 (공식 원문 미확인 — 참고용)
+· 낭송 속도 200~240자: 출처 불명으로 수업안에서 제외
+· 시간 배분: 팀 내 계산 검토로 확정 (외부 근거 아님)
+
+## 주의사항
+· 70대 수강생은 서서 낭송이 길면 어지러울 수 있습니다. 의자와 물을 가까이 두고 앉아서 하는 연습을 먼저 하세요.
+· 발표를 강요하지 말고 지원자를 받으세요. 첫 수업에서 긴장이 크면 다음 주로 미루는 편이 낫습니다.
+· 위 내용 중 수치는 공식 자료가 아니므로 대외 안내문에는 쓰지 마세요.`}
+  ]
+},
+{
+  id:'youtube',
+  title:'유튜브 첫 10편 주제 설계',
+  chip:'유튜브 첫 10편 주제',
+  question:'시낭송·표준발음법 유튜브 채널을 시작하려고 해. 첫 10편 주제를 정해줘. 혼자 촬영하고 편집은 최소로 하려고 해.',
+  script:[
+    {type:'round', n:1, label:'1라운드 · 개별 의견'},
+    {type:'msg', from:'yeonji', text:`혼자 촬영이면 10편을 한 번에 찍는 게 효율적입니다. 배경·조명·의상 고정, 길이는 5~8분, 자막은 자동 자막 + 수정.
+
+10편을 두 묶음(5편씩)으로 나눠 하루에 찍고, 업로드는 주 2회 화·목 저녁 7시로 고정하세요. 첫 편은 채널 소개가 아니라 '사람들이 바로 검색하는 문제'로 시작해야 합니다.
+
+준비물: 스마트폰 삼각대, 가능하면 무선 마이크, A4 대본, 조용한 방.`},
+    {type:'msg', from:'chat', text:`10편을 세 묶음으로 잡았습니다.
+
+[표준발음법 기초 4편]
+1. 받침 소리, 이것만 알면
+2. 연음 — 말이 이어질 때 소리가 바뀌는 곳
+3. 된소리되기
+4. 'ㅎ'이 사라지는 자리
+
+[시낭송 실기 3편]
+5. 호흡과 끊어 읽기
+6. 시 한 편 완성하기
+7. 감정 과잉 빼기
+
+[응용 3편]
+8. 자주 틀리는 단어 10개
+9. 낭송 대회 심사 기준
+10. 시 한 편 통째로 낭송
+
+썸네일 문구는 '이 발음, 틀리고 있습니다'처럼 한 줄로 끝내세요.`},
+    {type:'msg', from:'pf', text:`검색 수요가 확인되는 쪽은 '표준발음법', '받침 발음', '연음 법칙'입니다. 다만 유튜브 검색량 수치는 공개 API로 확인하지 못했습니다.
+
+직접 확인 방법: 유튜브 검색창에 '표준발음'을 치면 자동완성 목록이 뜹니다. 그 목록이 곧 수요입니다. 경쟁 채널은 같은 검색어 상위 10개를 보고 조회수를 비교하세요.
+
+근거로 쓰기 좋은 원문: 국립국어원 『표준 발음법』 (제2장 자음과 모음, 제4장 받침의 발음). 조항을 화면에 띄우면 신뢰도가 올라갑니다. 구체 채널명·조회수는 이 답에서 확인하지 않았습니다.`},
+    {type:'msg', from:'gem', text:`반론. 첫 10편을 '교육 과정'으로 만들면 초반 조회수가 안 나옵니다. 유튜브는 검색형(문제 해결)과 추천형(감동)이 다릅니다.
+
+대안: 1~2편은 '자주 틀리는 발음 10개' 같은 즉답형으로 조회수를 만들고, 3편부터 실기로 넘어가세요. 10편 중 한 편은 '대회 심사위원이 싫어하는 낭송'처럼 궁금증을 자극하는 제목이 필요합니다.`},
+
+    {type:'round', n:2, label:'2라운드 · 상호 검토'},
+    {type:'msg', from:'leader', text:`세 가지를 짚습니다.
+
+① 순서 충돌 — 챗주임은 교육 순서(받침 → 연음 → 된소리), 제미니는 조회수 순서(즉답형 먼저)를 말했습니다. 둘 다 맞지만 하나를 골라야 합니다.
+② 근거 — 퍼대리가 '검색량 미확인'이라고 밝힌 것을 근거처럼 쓰면 안 됩니다. 확인된 것과 직접 확인할 것을 나눠 적으세요.
+③ 첫 편 — 연과장의 '채널 소개보다 검색 문제'와 제미니의 '즉답형'은 같은 말입니다. 이건 확정.
+
+챗주임은 순서를 조회수 기준으로 다시 배열하고, 퍼대리는 근거를 두 칸으로 나눠 정리하고, 제미니는 10편 중 가장 약한 편을 지목해 주세요.`},
+    {type:'msg', from:'chat', text:`조회수 기준으로 다시 배열했습니다.
+
+1. 자주 틀리는 발음 10개 (즉답형)
+2. 받침 발음 3가지 규칙
+3. 연음, 이것만 알면
+4. 된소리되기
+5. 'ㅎ' 소리
+6. 호흡과 끊어 읽기
+7. 시 한 편 완성 (실기)
+8. 감정 과잉 빼기
+9. 대회 심사 기준
+10. 시 한 편 통째로 낭송 (마무리)
+
+1편에서 유입을 만들고, 6편부터 실기 수강생을 붙잡는 구조입니다.`},
+    {type:'msg', from:'pf', text:`근거를 두 칸으로 정리했습니다.
+
+[확인된 것]
+· 표준 발음법 조항이 국립국어원 자료로 존재함
+· 유튜브 자동완성으로 검색 수요를 직접 확인할 수 있음
+
+[직접 확인할 것]
+· 경쟁 채널 조회수·구독자 수
+· 키워드별 검색량 수치 (공개 자료 없음)
+
+미확인 수치는 영상·설명란에 쓰지 않는 것을 권합니다.`},
+    {type:'msg', from:'gem', text:`가장 약한 편은 9번 '심사 기준'입니다. 시청자층이 대회 준비생으로 좁습니다. '낭송 대회에서 감점되는 3가지'로 바꾸면 실기 수강생에게도 바로 쓸모가 있고, 제목도 더 세집니다.`},
+
+    {type:'round', n:3, label:'3라운드 · 대장 최종 정리'},
+    {type:'final', from:'leader', text:`## 결론
+첫 10편은 '즉답형으로 유입 → 실기로 신뢰' 순서로 갑니다. 촬영은 5편씩 두 번에 몰아서 합니다.
+
+## 핵심 내용
+1. 1편 '자주 틀리는 발음 10개'로 검색 유입을 만듭니다.
+2. 2~5편은 받침·연음·된소리·'ㅎ' — 표준 발음법 조항을 화면에 띄워 근거를 보여 줍니다.
+3. 6~8편은 호흡·끊어 읽기·한 편 완성 — 실기 수강생을 붙잡는 구간입니다.
+4. 9편은 '낭송 대회에서 감점되는 3가지'로 제목을 바꿉니다(원안 '심사 기준'은 대상이 좁음).
+5. 10편은 시 한 편 통째로 낭송 — 채널의 얼굴이 되는 영상입니다.
+
+## 실행 순서
+① 유튜브 검색창에서 '표준발음' 자동완성 10개를 적어 둔다 → ② 상위 채널 10개의 조회수를 표로 비교 → ③ 대본 10편을 먼저 다 쓴다 → ④ 5편씩 이틀에 몰아 촬영 → ⑤ 주 2회(화·목 저녁 7시) 업로드 → ⑥ 4주 뒤 조회수로 6~10편 제목을 다시 손본다
+
+## 출처·근거
+· 표준 발음법: 국립국어원 『표준 발음법』 (확인된 공식 자료)
+· 검색 수요: 유튜브 자동완성으로 직접 확인 (수치 자료 아님)
+· 경쟁 채널 조회수·검색량: 미확인 — 직접 조사 필요
+
+## 주의사항
+· 검색량·조회수 수치를 추정해서 자막이나 설명란에 쓰지 마세요. 틀린 수치는 채널 신뢰를 깎습니다.
+· 표준 발음법 조항을 인용할 때는 조항 번호와 원문을 함께 보여 주세요. 요약만 하면 반박당합니다.
+· 혼자 촬영하면 말이 길어지기 쉽습니다. 영상마다 6분을 넘기지 마세요.`}
+  ]
+},
+{
+  id:'column',
+  title:'블로그 칼럼 5편 설계',
+  chip:'블로그 칼럼 5편 주제',
+  question:'블로그에 명리심리상담과 시낭송 카테고리로 연재할 칼럼 주제 5개를 잡고, 각 주제의 근거 자료를 정리해줘.',
+  script:[
+    {type:'round', n:1, label:'1라운드 · 개별 의견'},
+    {type:'msg', from:'yeonji', text:`독자 동선을 먼저 잡았습니다. '증상 → 해석 → 시 한 편' 순서로 읽히면 상담 문의로 이어집니다.
+
+주제 후보 5개
+1. 같은 사주라도 말이 다르면 결과가 달라지는 이유
+2. 낭송이 마음을 가라앉히는 시간
+3. 60대 이후의 관계 지도
+4. 자녀와 말이 통하지 않을 때
+5. 돈이 새는 습관의 심리
+
+각 글 끝에 시 한 편과 3줄 낭송 안내를 붙이면 '읽고 끝'이 아니라 '직접 해 보는' 글이 됩니다. 발행은 주 1회 같은 요일이 좋습니다.`},
+    {type:'msg', from:'chat', text:`글마다 같은 뼈대를 쓰면 쓰기가 빨라집니다.
+
+· 도입 300자 — 독자의 말로 시작
+· 사례 1개 — 이름·상황은 바꿔서
+· 해석 3단 — ①지금 상태 ②왜 그런지 ③다음 한 걸음
+· 시 한 편 — 주제에 붙는 시 4~8행
+· 마무리 질문 1개
+
+이 뼈대로 5편을 표로 만들면, 1편당 1,500~2,000자가 됩니다.`},
+    {type:'msg', from:'pf', text:`근거 자료를 종류별로 정리했습니다.
+
+· 명리 이론: 『자평진전』, 『적천수』 같은 고전 — 원문 인용 가능
+· 심리: 애착·인지왜곡 같은 상담 개념 — 교과서 수준 설명으로 쓰면 안전
+· 시낭송의 심리 효과: 연구가 많지 않습니다. '효과가 입증됐다'고 쓰면 안 되고, '낭송할 때 호흡이 길어지고 주의가 한곳에 모인다' 같은 관찰로 써야 합니다.
+· 발음·낭송법: 국립국어원 자료가 공식 근거입니다.
+
+주의: 의학적 효능, 투자 조언으로 읽힐 표현은 피해야 합니다.`},
+    {type:'msg', from:'gem', text:`반론. 상담 칼럼에서 사주를 앞세우면 심리 쪽 독자가 등을 돌립니다.
+
+대안: 제목과 도입은 심리 이야기로 시작하고, 명리 해석은 글 후반부에 '다른 각도'로 배치하세요. 5편 중 1편은 독자 질문에 답하는 형식으로 쓰면 댓글이 붙고 다음 글의 소재가 됩니다.`},
+
+    {type:'round', n:2, label:'2라운드 · 상호 검토'},
+    {type:'msg', from:'leader', text:`세 가지를 고쳐야 합니다.
+
+① '돈이 새는 습관' — 상담 글에서 돈 이야기를 하면 투자 조언으로 읽힐 수 있습니다. 제목과 범위를 좁혀야 합니다.
+② 퍼대리의 경고가 핵심입니다. '시낭송이 스트레스를 낮춘다'는 식의 단정은 근거가 약합니다. 표현을 관찰 수준으로 낮추세요.
+③ 챗주임의 뼈대에는 '근거' 칸이 없습니다. 5편 각각에 근거 1개를 붙여야 글이 약해지지 않습니다.
+
+연과장은 5번 주제를 다듬고, 퍼대리는 허용되는 표현과 피해야 할 표현을 정리하고, 제미니는 순서 절충안을 확정해 주세요.`},
+    {type:'msg', from:'yeonji', text:`5번을 '돈을 대하는 마음의 습관'으로 바꿨습니다. 투자·재테크 조언은 쓰지 않고, 돈 앞에서 반복되는 감정과 말버릇만 다룹니다. 글 끝에 '이 글은 상담 관점의 이야기이며 투자 조언이 아닙니다'를 한 줄 넣겠습니다.`},
+    {type:'msg', from:'pf', text:`표현 정리입니다.
+
+[쓸 수 있는 표현]
+· "낭송할 때 호흡이 길어지고 주의가 한곳에 모인다" (관찰)
+· "고전에서는 …라고 본다" (명리 이론 소개)
+· "상담에서는 이런 경우 …로 설명한다" (심리 개념)
+
+[피할 표현]
+· "시낭송은 스트레스를 낮춘다" (효능 단정)
+· "이 사주는 돈을 못 모은다" (단정·낙인)
+· "지금 사면 된다" (투자 권유)
+
+관련 연구가 일부 있으나 이 글에서 단정하지 않는 것이 안전합니다.`},
+    {type:'msg', from:'gem', text:`절충안을 확정합니다. 제목과 첫 문단은 심리로 열고, 명리 해석은 후반 3분의 1에 '다른 각도'로 놓습니다. 5편 중 2편은 독자 질문 형식으로 바꿔 댓글을 부릅니다.`},
+
+    {type:'round', n:3, label:'3라운드 · 대장 최종 정리'},
+    {type:'final', from:'leader', text:`## 결론
+5편 모두 '심리로 열고, 명리로 해석하고, 시로 닫는' 같은 뼈대를 씁니다. 효능·투자 단정은 넣지 않습니다.
+
+## 핵심 내용
+1. 같은 사주라도 말이 다르면 결과가 달라지는 이유 — 근거: 상담의 인지왜곡 개념 + 고전의 용어 해석
+2. 낭송이 마음을 가라앉히는 시간 — 근거: 호흡·주의에 대한 관찰 서술 (효능 단정 금지)
+3. 60대 이후의 관계 지도 — 근거: 생애주기 상담 이론
+4. 자녀와 말이 통하지 않을 때 — 근거: 애착·의사소통 개념
+5. 돈을 대하는 마음의 습관 — 근거: 감정과 말버릇 관찰 (투자 조언 금지, 면책 한 줄)
+
+## 글 구조 (5편 공통)
+도입 300자 → 사례 1개 → 해석 3단(지금·왜·다음 한 걸음) → 시 4~8행 → 마무리 질문. 1편 1,500~2,000자.
+
+## 실행 순서
+① 5편 제목과 근거 1개씩을 표로 확정 → ② 1·2편 초안 → ③ 3·4편(독자 질문 형식) → ④ 5편 + 면책 문구 → ⑤ 주 1회 같은 요일 발행, 4주 뒤 댓글 반응으로 다음 5편 결정
+
+## 출처·근거
+· 명리: 『자평진전』·『적천수』 등 고전 (원문 인용 가능)
+· 심리: 애착·인지왜곡 등 상담 교과 개념
+· 발음·낭송: 국립국어원 자료
+· 시낭송의 심리 효과: 연구가 적음 — 단정하지 않고 관찰로 서술
+
+## 주의사항
+· "효과가 입증됐다", "이 사주는 돈을 못 모은다" 같은 단정·낙인 표현은 쓰지 마세요.
+· 상담 글은 의료 행위가 아닙니다. 우울·불면 등이 심한 독자에게는 전문기관 상담을 안내하는 문장을 넣으세요.
+· 5번 글에는 투자 조언이 아니라는 한 줄을 반드시 붙이세요.`}
+  ]
+}
+];
+
+/* AI 대장 단톡방 · 토론실 — 단일 파일 앱 */
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------ */
+  /* 기본 정의                                                           */
+  /* ------------------------------------------------------------------ */
+  const LS = { settings: 'aidj.settings.v1', thread: 'aidj.thread.v1', manuals: 'aidj.manuals.v1' };
+
+  const MEMBERS = {
+    leader: { name: '클로드 대장', short: '클', role: '대장 · 팩트체크' },
+    yeonji: { name: '연과장', short: '연', role: '실무 · 맥락' },
+    chat: { name: '챗주임', short: '챗', role: '구조화 · 초안' },
+    pf: { name: '퍼대리', short: '퍼', role: '근거 · 출처' },
+    gem: { name: '제미니 팀원', short: '제', role: '대안 · 반론' }
+  };
+  const ORDER = ['yeonji', 'chat', 'pf', 'gem'];
+  const ALL = ['leader', 'yeonji', 'chat', 'pf', 'gem'];
+
+  const PROV = {
+    anthropic: { label: '클로드', company: 'Anthropic', short: '클로드' },
+    openai: { label: '챗GPT', company: 'OpenAI', short: '챗GPT' },
+    gemini: { label: '제미나이', company: 'Google', short: '제미나이' },
+    perplexity: { label: '퍼플렉시티', company: 'Perplexity', short: '퍼플렉시티' }
+  };
+
+  const DEFAULTS = {
+    keys: { anthropic: '', openai: '', gemini: '', perplexity: '' },
+    models: {
+      anthropic: 'claude-sonnet-4-5',
+      openai: 'gpt-4o-mini',
+      gemini: 'gemini-2.5-flash',
+      perplexity: 'sonar'
+    },
+    multiPersona: true,
+    delegateEngine: 'auto',
+    yeonjiEngine: 'auto',
+    autoFallback: true,
+    proxy: '',
+    theme: 'light',
+    scale: 1,
+    helpSeen: false
+  };
+
+  const SYS = {
+    leader: `너는 AI 협업팀 'AI 대장 단톡방'의 대장 클로드다.
+역할: 동료 네 명(연과장·챗주임·퍼대리·제미니 팀원)의 답안을 대조해 허점과 모순을 짚고, 사실과 추측을 구분해 최종 결론을 낸다.
+원칙: 결론부터 쓴다. 확인되지 않은 수치·출처는 '확인 필요'로 표시한다. 출처를 지어내지 않는다. 한국어 존댓말(~습니다)로, 인사말 없이 바로 본론을 쓴다.`,
+    yeonji: `너는 '연과장'이다. 실무와 생활 맥락을 챙기는 참모다.
+역할: 실제로 실행할 때 빠지는 것(시간·준비물·순서·비용·사람·건강)을 채우고 현실적 제약을 짚는다.
+원칙: 구체적으로 쓴다. 추상적 조언 대신 오늘 바로 할 수 있는 단위로 쪼갠다. 한국어 존댓말, 인사 없이 본론.`,
+    chat: `너는 '챗주임'이다. 질문을 구조화해 1차 초안을 만드는 역할이다.
+역할: 질문을 3~5개 항목으로 나누고 바로 쓸 수 있는 뼈대와 초안을 제시한다.
+원칙: 번호와 소제목으로 정리한다. 한국어 존댓말, 인사 없이 본론.`,
+    pf: `너는 '퍼대리'다. 근거·출처·수치를 확인하는 역할이다.
+역할: 확인된 사실과 확인되지 않은 것을 구분한다. 출처는 기관명·문서명 수준으로 적는다.
+원칙: 절대 출처나 수치를 지어내지 않는다. 확실하지 않으면 '직접 확인 필요'라고 쓴다. 한국어 존댓말, 인사 없이 본론.`,
+    gem: `너는 '제미니 팀원'이다. 다른 각도에서 대안과 반론을 던지는 역할이다.
+역할: 앞선 의견과 겹치지 않게 위험, 반대 관점, 새 아이디어를 낸다.
+원칙: 반론에는 반드시 대안을 붙인다. 한국어 존댓말, 인사 없이 본론.`
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* 작은 도구                                                           */
+  /* ------------------------------------------------------------------ */
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function waitC(ms) {
+    const step = 120;
+    let left = ms;
+    while (left > 0) {
+      if (state && state.cancelled) return false;
+      const d = Math.min(step, left);
+      await sleep(d);
+      left -= d;
+    }
+    return true;
+  }
+  const nowTime = (t) => new Date(t || Date.now()).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  const nowDay = () => new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function mdLite(s) {
+    return esc(s)
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+      .replace(/^(#{1,3})\s*(.+)$/gm, '<span class="h">$2</span>')
+      .replace(/(<span class="h">[^<]*<\/span>)\n+/g, '$1');
+  }
+  function renderMd(md) {
+    const lines = String(md || '').split('\n');
+    let out = '', list = null;
+    const closeList = () => { if (list) { out += '</' + list + '>'; list = null; } };
+    const inline = (t) => esc(t).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>');
+    for (const raw of lines) {
+      const line = raw.replace(/\s+$/, '');
+      if (!line.trim()) { closeList(); continue; }
+      if (/^---+$/.test(line.trim())) { closeList(); out += '<hr>'; continue; }
+      if (/^#\s+/.test(line)) { closeList(); out += '<h1>' + inline(line.replace(/^#\s+/, '')) + '</h1>'; continue; }
+      if (/^##\s+/.test(line)) { closeList(); out += '<h2>' + inline(line.replace(/^##\s+/, '')) + '</h2>'; continue; }
+      if (/^###\s+/.test(line)) { closeList(); out += '<h3>' + inline(line.replace(/^###\s+/, '')) + '</h3>'; continue; }
+      if (/^>\s?/.test(line)) { closeList(); out += '<blockquote>' + inline(line.replace(/^>\s?/, '')) + '</blockquote>'; continue; }
+      if (/^[-*]\s+/.test(line)) {
+        if (list !== 'ul') { closeList(); out += '<ul>'; list = 'ul'; }
+        out += '<li>' + inline(line.replace(/^[-*]\s+/, '')) + '</li>'; continue;
+      }
+      if (/^\d+[.)]\s+/.test(line)) {
+        if (list !== 'ol') { closeList(); out += '<ol>'; list = 'ol'; }
+        out += '<li>' + inline(line.replace(/^\d+[.)]\s+/, '')) + '</li>'; continue;
+      }
+      closeList();
+      out += '<p>' + inline(line) + '</p>';
+    }
+    closeList();
+    return out;
+  }
+
+  function loadJSON(key, fallback) {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+  }
+  function saveJSON(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* 용량 초과 등 */ }
+  }
+  function deepMerge(base, over) {
+    const out = Array.isArray(base) ? base.slice() : Object.assign({}, base);
+    if (!over || typeof over !== 'object') return out;
+    Object.keys(over).forEach((k) => {
+      if (over[k] && typeof over[k] === 'object' && !Array.isArray(over[k]) && base[k] && typeof base[k] === 'object') out[k] = deepMerge(base[k], over[k]);
+      else if (over[k] !== undefined) out[k] = over[k];
+    });
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 상태                                                                */
+  /* ------------------------------------------------------------------ */
+  const state = {
+    settings: deepMerge(DEFAULTS, loadJSON(LS.settings, {})),
+    thread: loadJSON(LS.thread, []),
+    manuals: loadJSON(LS.manuals, []),
+    running: false,
+    cancelled: false,
+    ctrl: null,
+    mode: 'idle',
+    delegateProvider: null,
+    qid: null,
+    lastQid: null,
+    currentQ: '',
+    lastFinal: '',
+    lastDemo: false,
+    round: 0
+  };
+  if (!Array.isArray(state.thread)) state.thread = [];
+  if (!Array.isArray(state.manuals)) state.manuals = [];
+
+  const chat = $('chat'), input = $('input'), toastEl = $('toast');
+  let autoScroll = true;
+
+  /* ------------------------------------------------------------------ */
+  /* 테마 · 글자 크기                                                     */
+  /* ------------------------------------------------------------------ */
+  function applyTheme() {
+    document.documentElement.dataset.theme = state.settings.theme;
+    $('themeBtn').textContent = state.settings.theme === 'dark' ? '☀️' : '🌙';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', state.settings.theme === 'dark' ? '#12100D' : '#F1EDE5');
+  }
+  function applyScale() {
+    document.documentElement.style.setProperty('--scale', String(state.settings.scale));
+  }
+  function cycleScale() {
+    const steps = [1, 1.12, 1.25];
+    const i = steps.indexOf(state.settings.scale);
+    state.settings.scale = steps[(i + 1) % steps.length];
+    applyScale();
+    saveJSON(LS.settings, state.settings);
+    toast(state.settings.scale === 1 ? '글자 크기: 보통' : state.settings.scale < 1.2 ? '글자 크기: 크게' : '글자 크기: 아주 크게');
+  }
+
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toastEl.classList.remove('show'), 2600);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 제공사 호출                                                          */
+  /* ------------------------------------------------------------------ */
+  function AppError(code, message) { const e = new Error(message); e.code = code; return e; }
+
+  function endpointOf(prov) {
+    const s = state.settings;
+    let url;
+    if (prov === 'anthropic') url = 'https://api.anthropic.com/v1/messages';
+    else if (prov === 'openai') url = 'https://api.openai.com/v1/chat/completions';
+    else if (prov === 'perplexity') url = 'https://api.perplexity.ai/chat/completions';
+    else url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(s.models.gemini || DEFAULTS.models.gemini) + ':generateContent';
+    const proxy = (s.proxy || '').trim().replace(/\/+$/, '');
+    if (proxy) return proxy + (proxy.indexOf('?') >= 0 ? '&' : '?') + 'url=' + encodeURIComponent(url);
+    return url;
+  }
+
+  function headersOf(prov) {
+    const key = (state.settings.keys[prov] || '').trim();
+    const h = { 'Content-Type': 'application/json' };
+    if (prov === 'anthropic') {
+      h['x-api-key'] = key;
+      h['anthropic-version'] = '2023-06-01';
+      h['anthropic-dangerous-direct-browser-access'] = 'true';
+   } else if (prov === 'gemini') {
+      h['x-goog-api-key'] = key;
+    } else {
+      h['Authorization'] = 'Bearer ' + key;
+    }
+    return h;
+  }
+
+  function bodyOf(prov, system, user, maxTokens, temperature) {
+    const s = state.settings;
+    if (prov === 'anthropic') {
+      return {
+        model: s.models.anthropic || DEFAULTS.models.anthropic,
+        max_tokens: maxTokens,
+        temperature: temperature,
+        system: system,
+        messages: [{ role: 'user', content: user }]
+      };
+    }
+    if (prov === 'gemini') {
+      return {
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts: [{ text: user }] }],
+        generationConfig: { temperature: temperature, maxOutputTokens: maxTokens }
+      };
+    }
+    return {
+      model: prov === 'perplexity' ? (s.models.perplexity || DEFAULTS.models.perplexity) : (s.models.openai || DEFAULTS.models.openai),
+      temperature: temperature,
+      max_tokens: maxTokens,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }]
+    };
+  }
+
+  function extractText(prov, j) {
+    if (prov === 'anthropic') {
+      return ((j && j.content) || []).filter((b) => b && b.type === 'text').map((b) => b.text).join('\n').trim();
+    }
+    if (prov === 'gemini') {
+      const c = j && j.candidates && j.candidates[0];
+      const parts = (c && c.content && c.content.parts) || [];
+      return parts.map((p) => (p && p.text) || '').join('').trim();
+    }
+    return (((j && j.choices && j.choices[0] && j.choices[0].message) || {}).content || '').trim();
+  }
+
+  async function callProvider(prov, opts) {
+    const key = (state.settings.keys[prov] || '').trim();
+    const label = PROV[prov].label;
+    if (!key) throw AppError('key', label + ' 키가 설정되어 있지 않습니다.');
+
+    const ac = new AbortController();
+    let timedOut = false;
+    const onCancel = () => { try { ac.abort(); } catch (e) {} };
+    if (state.ctrl) state.ctrl.signal.addEventListener('abort', onCancel, { once: true });
+    const timer = setTimeout(() => { timedOut = true; try { ac.abort(); } catch (e) {} }, opts.timeoutMs || 120000);
+
+    const attempt = async () => {
+      const body = bodyOf(prov, opts.system || '', opts.user, opts.maxTokens || 1000, opts.temperature == null ? 0.75 : opts.temperature);
+      let res;
+      try {
+        res = await fetch(endpointOf(prov), {
+          method: 'POST',
+          headers: headersOf(prov),
+          body: JSON.stringify(body),
+          signal: ac.signal
+        });
+      } catch (e) {
+        if (state.cancelled) throw AppError('cancel', '중단되었습니다.');
+        if (timedOut) throw AppError('timeout', label + ' 응답이 너무 늦습니다(2분 초과). 잠시 뒤 다시 시도해 주세요.');
+        throw AppError('net', label + '에 연결하지 못했습니다. 브라우저가 직접 호출을 막았거나(CORS) 인터넷이 끊겼을 수 있습니다. 설정의 중계 주소를 쓰거나 다른 엔진으로 대체해 주세요.');
+      }
+      const text = await res.text();
+      if (!res.ok) {
+        let detail = text;
+        try { const jj = JSON.parse(text); detail = (jj.error && (jj.error.message || jj.error.status)) || text; } catch (e) {}
+        detail = String(detail || '').slice(0, 180);
+        let msg;
+        if (res.status === 401 || res.status === 403) msg = label + ' 키가 거부되었습니다 (HTTP ' + res.status + '). 설정에서 키를 다시 확인해 주세요.';
+        else if (res.status === 404) msg = label + ' 모델명을 찾지 못했습니다 (HTTP 404). 설정 > 고급에서 모델명을 확인해 주세요.';
+        else if (res.status === 429) msg = label + ' 사용 한도를 넘었습니다 (HTTP 429). 잠시 뒤 다시 시도해 주세요.';
+        else if (res.status >= 500) msg = label + ' 서버 오류입니다 (HTTP ' + res.status + ').';
+        else msg = label + ' 오류 (HTTP ' + res.status + '): ' + detail;
+        let code = 'http' + res.status;
+        if (res.status === 401 || res.status === 403) code = 'auth';
+        else if (res.status === 400 && /api[ _-]?key|인증/i.test(detail || '')) code = 'auth';
+        else if (res.status === 404) code = 'model';
+        const err = AppError(code, msg);
+        err.status = res.status;
+        throw err;
+      }
+      let j;
+      try { j = JSON.parse(text); } catch (e) { throw AppError('parse', label + ' 응답을 읽지 못했습니다.'); }
+      const out = extractText(prov, j);
+      if (!out) {
+        if (j && j.promptFeedback && j.promptFeedback.blockReason) throw AppError('blocked', label + '가 이 질문을 거절했습니다(' + j.promptFeedback.blockReason + '). 질문을 바꿔 보세요.');
+        throw AppError('empty', label + '가 빈 응답을 보냈습니다.');
+      }
+      return out;
+    };
+
+    try {
+      let waitMs = 2000;
+      for (let retry = 0; retry < 4; retry++) {
+        try { return await attempt(); }
+        catch (e) {
+          if (e.code === 'cancel') throw e;
+          if ((e.status === 429 || e.status >= 500) && retry < 3) {
+            const sec = Math.ceil(waitMs / 1000);
+            setStatus('요청 한도 대기 중 (' + sec + '초 뒤 재시도)…', 'busy');
+            const ok = await waitC(waitMs);
+            if (!ok) throw AppError('cancel', '중단되었습니다.');
+            waitMs = Math.min(waitMs * 2.2, 20000);
+            continue;
+          }
+          throw e;
+        }
+      }
+    } finally {
+      clearTimeout(timer);
+      if (state.ctrl) state.ctrl.signal.removeEventListener('abort', onCancel);
+    }
+  }
+
+  function available() { return ['anthropic', 'openai', 'gemini', 'perplexity'].filter((p) => (state.settings.keys[p] || '').trim()); }
+
+  function autoDelegate() {
+    const a = available();
+    for (const p of ['gemini', 'openai', 'anthropic', 'perplexity']) if (a.indexOf(p) >= 0) return p;
+    return null;
+  }
+
+  function decideMode() {
+    const a = available();
+    if (!a.length) return 'demo';
+    if (a.length >= 4) return 'full';
+    return state.settings.multiPersona ? 'multi' : 'full';
+  }
+
+  function assignmentFor(member) {
+    if (member === 'leader') return 'anthropic';
+    if (member === 'chat') return 'openai';
+    if (member === 'pf') return 'perplexity';
+    if (member === 'gem') return 'gemini';
+    const pref = state.settings.yeonjiEngine;
+    const av = available();
+    if (pref && pref !== 'auto') return pref;
+    for (const p of ['anthropic', 'gemini', 'openai', 'perplexity']) if (av.indexOf(p) >= 0) return p;
+    return 'gemini';
+  }
+
+  function fallbackOrder(primary) {
+    const rest = ['gemini', 'anthropic', 'openai', 'perplexity'].filter((p) => p !== primary);
+    return rest;
+  }
+
+  async function ask(member, opts) {
+    const multi = state.mode === 'multi';
+    const system = SYS[member] + (multi
+      ? '\n\n[중요] 지금은 한 엔진이 팀의 다섯 역할을 번갈아 수행하고 있다. 너는 오직 ' + MEMBERS[member].name + ' 한 사람으로서만 말한다. 다른 역할의 말투를 흉내 내지 말고 자기 역할 범위 안에서 답한다.'
+      : '');
+    const common = { system, user: opts.user, maxTokens: opts.maxTokens || 900, temperature: opts.temperature == null ? 0.75 : opts.temperature };
+
+    if (multi) {
+      const p = state.delegateProvider;
+      const text = await callProvider(p, common);
+      return { text, provider: p, swapped: false };
+    }
+
+    const primary = assignmentFor(member);
+    const list = [primary].concat(state.settings.autoFallback ? fallbackOrder(primary) : []).filter((p, i, arr) => arr.indexOf(p) === i && (state.settings.keys[p] || '').trim());
+    if (!list.length) throw AppError('nokey', MEMBERS[member].name + '이 쓸 수 있는 엔진이 없습니다. 설정에서 키를 넣어 주세요.');
+    let lastErr = null;
+    for (const p of list) {
+      try {
+        const text = await callProvider(p, common);
+        return { text, provider: p, swapped: p !== primary };
+      } catch (e) {
+        if (e.code === 'cancel') throw e;
+        lastErr = e;
+        if (!state.settings.autoFallback) throw e;
+      }
+    }
+    throw lastErr || AppError('fail', '응답을 받지 못했습니다.');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 렌더링                                                              */
+  /* ------------------------------------------------------------------ */
+  function renderRoster() {
+    const box = $('roster');
+    box.innerHTML = '';
+    ALL.forEach((k) => {
+      const m = MEMBERS[k];
+      const el = document.createElement('div');
+      el.className = 'member';
+      el.setAttribute('data-mc', k);
+      el.dataset.member = k;
+      el.innerHTML = '<span class="m-av">' + m.short + '</span>' +
+        '<span class="m-tx"><span class="m-name">' + esc(m.name) + '</span><span class="m-role">' + esc(m.role) + '</span></span>';
+      box.appendChild(el);
+    });
+  }
+
+  function setMemberState(k, s) {
+    const el = document.querySelector('.member[data-member="' + k + '"]');
+    if (!el) return;
+    el.classList.toggle('active', s === 'active');
+    el.classList.toggle('done', s === 'done');
+  }
+  function resetMembers() { ALL.forEach((k) => setMemberState(k, 'idle')); }
+
+  function setStatus(text, kind) {
+    const st = $('status');
+    st.className = 'status' + (kind ? ' ' + kind : '');
+    $('statusText').textContent = text;
+  }
+
+  function setRound(n, done) {
+    state.round = n;
+    document.querySelectorAll('.step').forEach((s) => {
+      const i = Number(s.dataset.step);
+      s.classList.toggle('active', !done && i === n);
+      s.classList.toggle('past', done || (n > 0 && i < n));
+    });
+  }
+
+  function scrollDown(force) {
+    if (!autoScroll && !force) return;
+    requestAnimationFrame(() => { chat.scrollTop = chat.scrollHeight; });
+  }
+
+  function addRoundLine(n, label) {
+    const d = document.createElement('div');
+    d.className = 'roundline';
+    d.innerHTML = '<span>' + esc(label || (n + '라운드')) + '</span>';
+    chat.appendChild(d);
+    scrollDown();
+  }
+
+  function addSys(text, tone, action) {
+    const d = document.createElement('div');
+    d.className = 'sys' + (tone === 'warn' ? ' warn' : '');
+    d.innerHTML = '<span>' + esc(text) + (action ? '<br><button class="btn small" data-act="' + esc(action.act) + '">' + esc(action.label) + '</button>' : '') + '</span>';
+    chat.appendChild(d);
+    scrollDown();
+    return d;
+  }
+
+  function addDayLine() {
+    const d = document.createElement('div');
+    d.className = 'dayline';
+    d.innerHTML = '<span>' + esc(nowDay()) + '</span>';
+    chat.appendChild(d);
+  }
+
+  function msgMeta(m, o) {
+    let s = '<span class="name">' + esc(m.name) + '</span><span class="tag">' + esc(m.role) + '</span>';
+    if (o.demo) s += '<span class="dmtag">데모</span>';
+    if (o.swap) s += '<span class="swap">대체 엔진 ' + esc(PROV[o.swap].label) + '</span>';
+    s += '<span class="time">' + esc(nowTime(o.t)) + '</span>';
+    return s;
+  }
+
+  function addMsg(o) {
+    const from = o.from;
+    const el = document.createElement('div');
+    if (from === 'me') {
+      el.className = 'msg me';
+      const atts = Array.isArray(o.files) ? o.files : [];
+      const badges = atts.length
+        ? '<div class="att-badges">' + atts.map((f) => '<span class="att-badge">📄 ' + esc(f.name) + (f.chars ? ' <i>' + Number(f.chars).toLocaleString('ko-KR') + '자</i>' : '') + '</span>').join('') + '</div>'
+        : '';
+      el.innerHTML = '<div class="bwrap"><div class="meta"><span class="time">' + esc(nowTime(o.t)) + '</span></div>' +
+        '<div class="bubble">' + mdLite(o.text) + '</div>' + badges + '</div>';
+      chat.appendChild(el);
+    } else {
+      const m = MEMBERS[from];
+      el.className = 'msg' + (from === 'leader' ? ' leader' : '');
+      el.setAttribute('data-mc', from);
+      const isFinal = o.kind === 'final';
+      const body = isFinal
+        ? '<div class="final"><div class="final-head"><span class="fh-t">🏁 최종 답변 초안</span><span class="fh-b">대장 검증 완료</span><button class="btn small" data-copy-final title="초안 복사">📋 복사</button><span class="fh-m">' + esc(nowTime(o.t)) + '</span></div>' +
+          '<div class="final-body">' + mdLite(o.text) + '</div>' +
+          '<div class="final-actions"><button class="btn primary" data-copy-final>📋 복사</button><button class="btn" data-save-manual>📄 매뉴얼로 저장</button></div>' +
+          '<div class="final-note">AI 초안입니다. 돈·계약·건강처럼 중요한 결정 전에는 원문과 공식 자료를 확인하세요.</div></div>'
+        : '<div class="bubble">' + mdLite(o.text) + '</div>';
+      el.innerHTML = '<div class="avatar">' + m.short + '</div><div class="bwrap"><div class="meta">' + msgMeta(m, o) + '</div>' + body + '</div>';
+      if (isFinal) {
+        el.querySelectorAll('[data-copy-final]').forEach((b) => { b._final = o.text; });
+        const sb = el.querySelector('[data-save-manual]');
+        if (sb) { sb._final = o.text; sb._qid = o.qid || state.qid; }
+      }
+      chat.appendChild(el);
+    }
+    scrollDown();
+
+    if (o.store !== false) {
+      state.thread.push({ from: from, kind: o.kind || 'text', text: o.text, round: o.round || 0, demo: !!o.demo, swap: o.swap || null, t: o.t || Date.now(), qid: o.qid || state.qid, files: (Array.isArray(o.files) && o.files.length) ? o.files : null });
+      saveJSON(LS.thread, state.thread);
+    }
+    return el;
+  }
+
+  function typingBubble(from) {
+    const m = MEMBERS[from];
+    const el = document.createElement('div');
+    el.className = 'msg' + (from === 'leader' ? ' leader' : '');
+    el.setAttribute('data-mc', from);
+    el.innerHTML = '<div class="avatar">' + m.short + '</div><div class="bwrap"><div class="meta">' +
+      '<span class="name">' + esc(m.name) + '</span><span class="tag">' + esc(m.role) + '</span><span class="time">' + nowTime() + '</span></div>' +
+      '<div class="bubble"><span class="typing"><i></i><i></i><i></i></span></div></div>';
+    chat.appendChild(el);
+    scrollDown();
+    return el;
+  }
+
+  function greeting() {
+    const hasKey = available().length > 0;
+    addMsg({
+      from: 'leader',
+      store: false,
+      text: '지휘자님, 다섯 명 준비됐습니다.\n\n질문을 던져 주세요. 1라운드에서 네 팀원이 각자 답하고, 2라운드에서 제가 허점과 모순을 짚으면 팀원이 보완합니다. 3라운드에서 제가 노란 박스에 최종 답변 초안을 올리면, 복사하거나 매뉴얼로 저장하시면 됩니다.' +
+        (hasKey ? '' : '\n\n지금은 API 키가 없어 실제 토론은 되지 않습니다. 아래 [▶ 데모 시연해 보기]로 흐름을 먼저 보시고, ⚙️ 설정에서 키를 넣어 주세요.')
+    });
+  }
+
+  function renderThread() {
+    chat.innerHTML = '';
+    if (!state.thread.length) { addDayLine(); greeting(); return; }
+    addDayLine();
+    let lastRound = 0;
+    state.thread.forEach((m) => {
+      if (m.round && m.round !== lastRound) {
+        lastRound = m.round;
+        addRoundLine(m.round, m.round + '라운드 · ' + (m.round === 1 ? '개별 의견' : m.round === 2 ? '상호 검토' : '대장 최종 정리'));
+      }
+      addMsg(Object.assign({}, m, { store: false }));
+    });
+    autoScroll = true;
+    scrollDown(true);
+    addSys('이전 대화를 이어서 불러왔습니다. 새 질문을 보내면 이어서 진행합니다.');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 진행 상태 UI                                                        */
+  /* ------------------------------------------------------------------ */
+  function setBusy(on) {
+    state.running = on;
+    $('sendBtn').disabled = on;
+    $('stopBtn').hidden = !on;
+    $('sendBtn').style.display = on ? 'none' : '';
+    $('stopBtn').style.display = on ? '' : 'none';
+  }
+
+  function refreshModeNote() {
+    const a = available();
+    const mode = decideMode();
+    const note = $('modeNote');
+    if (mode === 'demo') {
+      note.textContent = '키 없음 · 데모만 가능 · ⚙️ 설정에서 키를 넣으세요';
+    } else if (mode === 'multi') {
+      const p = state.settings.delegateEngine !== 'auto' && a.indexOf(state.settings.delegateEngine) >= 0 ? state.settings.delegateEngine : autoDelegate();
+      note.textContent = '대행 모드 · ' + PROV[p].label + ' 1개 엔진이 5역할을 맡습니다.';
+    } else {
+      const parts = [];
+      [['leader', 'anthropic'], ['yeonji', null], ['chat', 'openai'], ['pf', 'perplexity'], ['gem', 'gemini']].forEach(([k, p]) => {
+        const prov = p || assignmentFor(k);
+        parts.push(MEMBERS[k].name.replace(' 팀원', '') + '=' + (a.indexOf(prov) >= 0 ? PROV[prov].label : '대체'));
+      });
+      note.textContent = '4개 엔진 모드 · ' + parts.join(' · ');
+    }
+    $('demoChip').hidden = !(state.lastDemo && state.mode === 'demo');
+  }
+
+  function renderChips() {
+    const box = $('chips');
+    box.innerHTML = '';
+    (window.AIDJ_DEMO || []).forEach((p) => {
+      const b = document.createElement('button');
+      b.className = 'chip';
+      b.type = 'button';
+      b.textContent = '💬 ' + p.chip;
+      b.addEventListener('click', () => { runPreset(p); });
+      box.appendChild(b);
+    });
+    const h = document.createElement('button');
+    h.type = 'button';
+    h.className = 'chip';
+    h.textContent = '❓ 사용법';
+    h.addEventListener('click', () => openHelp());
+    box.appendChild(h);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 질문 프롬프트                                                        */
+  /* ------------------------------------------------------------------ */
+  function pRound1(q, k) {
+    return '[사용자 질문]\n' + q + '\n\n[지시]\n위 질문에 ' + MEMBERS[k].name + '의 역할 관점에서만 답하세요.\n- 5~9문장. 번호나 줄바꿈으로 읽기 쉽게.\n- 인사말·자기소개 없이 본론부터.\n- 확실하지 않은 수치·출처는 "확인 필요"라고 표시.\n- 다른 팀원을 언급하지 말고 자기 의견만 쓰세요.';
+  }
+  function pRound2Leader(q, answers) {
+    const list = ORDER.map((k) => '[' + MEMBERS[k].name + ']\n' + (answers[k] || '(응답 없음)')).join('\n\n');
+    return '[사용자 질문]\n' + q + '\n\n[1라운드 팀원 답변]\n' + list + '\n\n[지시]\n대장으로서 다음을 하세요.\n1) 서로 어긋나는 점(시간·수치·순서·결론)을 구체적으로 짚기\n2) 근거가 약하거나 지어낸 듯한 주장 지적\n3) 빠진 관점 지적\n4) 각 팀원에게 재확인 질문을 이름을 붙여 던지기\n5~8문장, 인사 없이.';
+  }
+  function pRound2Member(q, k, my, critique) {
+    return '[질문]\n' + q + '\n\n[내 1라운드 답변]\n' + (my || '') + '\n\n[대장의 지적]\n' + critique + '\n\n[지시]\n지적받은 부분만 3~5문장으로 보완하거나 반박하세요. 동의하면 수정안을, 아니면 근거를 들어 반박하세요. 다른 팀원 이야기는 하지 마세요.';
+  }
+  function pRound3(q, answers, critique, rebuttals) {
+    const a = ORDER.map((k) => '[' + MEMBERS[k].name + '] ' + (answers[k] || '')).join('\n');
+    const r = ORDER.filter((k) => rebuttals[k]).map((k) => '[' + MEMBERS[k].name + '] ' + rebuttals[k]).join('\n');
+    return '[사용자 질문]\n' + q + '\n\n[1라운드]\n' + a + '\n\n[2라운드 대장 검토]\n' + critique + '\n\n[2라운드 팀원 보완]\n' + (r || '(없음)') +
+      '\n\n[지시]\n이제 최종 답변 초안을 쓰세요. 사용자가 그대로 복사해 쓸 수 있어야 합니다. 아래 형식만 쓰세요.\n\n## 결론\n(한두 문장)\n## 핵심 내용\n1. …\n2. …\n## 실행 순서\n(해당될 때만, 없으면 생략)\n## 출처·근거\n- 확인된 것과 확인이 필요한 것을 구분\n## 주의사항\n- …\n\n규칙: 확인되지 않은 수치·출처를 만들지 말 것. 700~1100자. 팀원 소개나 인사말 없이.';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 실제 토론 파이프라인                                                 */
+  /* ------------------------------------------------------------------ */
+  function cancelErr() { return AppError('cancel', '중단되었습니다.'); }
+
+  async function startDebate(question, attachFiles) {
+    if (state.running) return;
+    const used = Array.isArray(attachFiles) ? attachFiles : [];
+    const att = attachmentBlock(question, used);
+    const promptQ = att.text;
+    state.cancelled = false;
+    state.lastDemo = false;
+    state.lastFinal = '';
+    autoScroll = true;
+    state.currentQ = question;
+    state.qid = uid();
+    state.lastQid = state.qid;
+    resetMembers();
+    setRound(0);
+
+    state.mode = decideMode();
+    addMsg({ from: 'me', text: question, store: true, files: used.map((f) => ({ name: f.name, chars: f.chars })) });
+    if (att.truncated) addSys('첨부 본문이 25,000자를 넘어 앞부분 ' + att.used.toLocaleString('ko-KR') + '자만 전달합니다(원문 모두 ' + att.total.toLocaleString('ko-KR') + '자). 뒷부분까지 검토하려면 파일을 나누어 올려 주세요.', 'warn');
+
+    if (state.mode === 'demo') {
+      if (used.length) addSys('지금은 API 키가 없어 데모로 진행합니다. 첨부한 파일 ' + used.length + '개는 실제 AI에게 전달되지 않았습니다. ⚙️ 설정에서 키를 넣으면 파일 내용까지 읽고 토론합니다.', 'warn', { label: '⚙️ 설정 열기', act: 'settings' });
+      const p = pickPreset(question);
+      await runDemo(p, question);
+      return;
+    }
+
+    state.ctrl = new AbortController();
+    setBusy(true);
+    $('demoChip').hidden = true;
+
+    if (state.mode === 'multi') {
+      state.delegateProvider = (state.settings.delegateEngine !== 'auto' && available().indexOf(state.settings.delegateEngine) >= 0)
+        ? state.settings.delegateEngine : autoDelegate();
+      addSys('한 엔진(' + PROV[state.delegateProvider].label + ')이 다섯 역할을 번갈아 대행합니다. 설정에서 4개 키를 넣으면 회사별 엔진으로 나뉩니다.');
+    }
+
+    const answers = {};
+    const rebuttals = {};
+    let critique = '';
+
+    try {
+      /* --- 1라운드 --- */
+      setRound(1);
+      setStatus('1라운드 · 팀원 답변 중', 'busy');
+      addRoundLine(1, '1라운드 · 개별 의견');
+
+      for (const k of ORDER) {
+        if (state.cancelled) throw cancelErr();
+        setMemberState(k, 'active');
+        setStatus('1라운드 · ' + MEMBERS[k].name + ' 작성 중', 'busy');
+        const tb = typingBubble(k);
+        try {
+          const r = await ask(k, { user: pRound1(promptQ, k), maxTokens: 900, temperature: 0.8 });
+          tb.remove();
+          answers[k] = r.text;
+          addMsg({ from: k, text: r.text, round: 1, swap: r.swapped ? r.provider : null });
+          setMemberState(k, 'done');
+        } catch (e) {
+          tb.remove();
+          if (e.code === 'cancel') throw e;
+          if (e.code === 'auth' || e.code === 'model' || e.code === 'key' || e.code === 'nokey') throw e;
+          answers[k] = '';
+          addSys(MEMBERS[k].name + ' 응답 실패 — ' + e.message, 'warn');
+          setMemberState(k, 'idle');
+        }
+      }
+
+      /* --- 2라운드 --- */
+      if (state.cancelled) throw cancelErr();
+      setRound(2);
+      setStatus('2라운드 · 대장 검토 중', 'busy');
+      addRoundLine(2, '2라운드 · 상호 검토');
+
+      setMemberState('leader', 'active');
+      {
+        const tb = typingBubble('leader');
+        try {
+          const r = await ask('leader', { user: pRound2Leader(promptQ, answers), maxTokens: 800, temperature: 0.6 });
+          tb.remove();
+          critique = r.text;
+          addMsg({ from: 'leader', text: r.text, round: 2, swap: r.swapped ? r.provider : null });
+          setMemberState('leader', 'done');
+        } catch (e) {
+          tb.remove();
+          throw e;
+        }
+      }
+
+      for (const k of ORDER) {
+        if (state.cancelled) throw cancelErr();
+        if (!answers[k]) continue;
+        setMemberState(k, 'active');
+        setStatus('2라운드 · ' + MEMBERS[k].name + ' 보완 중', 'busy');
+        const tb = typingBubble(k);
+        try {
+          const r = await ask(k, { user: pRound2Member(promptQ, k, answers[k], critique), maxTokens: 500, temperature: 0.7 });
+          tb.remove();
+          rebuttals[k] = r.text;
+          addMsg({ from: k, text: r.text, round: 2, swap: r.swapped ? r.provider : null });
+          setMemberState(k, 'done');
+        } catch (e) {
+          tb.remove();
+          if (e.code === 'cancel') throw e;
+          addSys(MEMBERS[k].name + ' 보완 실패 — ' + e.message, 'warn');
+        }
+      }
+
+      /* --- 3라운드 --- */
+      if (state.cancelled) throw cancelErr();
+      setRound(3);
+      setStatus('3라운드 · 대장 정리 중', 'busy');
+      addRoundLine(3, '3라운드 · 대장 최종 정리');
+
+      setMemberState('leader', 'active');
+      const tb = typingBubble('leader');
+      let finalMsg;
+      try {
+        const r = await ask('leader', { user: pRound3(promptQ, answers, critique, rebuttals), maxTokens: 1500, temperature: 0.5 });
+        tb.remove();
+        state.lastFinal = r.text;
+        finalMsg = addMsg({ from: 'leader', kind: 'final', text: r.text, round: 3, swap: r.swapped ? r.provider : null });
+        setMemberState('leader', 'done');
+      } catch (e) {
+        tb.remove();
+        throw e;
+      }
+
+      setRound(0, true);
+      setStatus('완료 · 최종 초안 도착', 'done');
+      toast('토론이 끝났습니다. 초안을 복사하거나 매뉴얼로 저장하세요.');
+      focusFinal(finalMsg);
+    } catch (e) {
+      if (e.code === 'cancel') {
+        setStatus('중단됨', '');
+        addSys('대장이 토론을 멈췄습니다. 이어서 하려면 질문을 다시 보내 주세요.', 'warn');
+      } else {
+        setStatus('오류로 멈춤', '');
+        if (e.code === 'auth' || e.code === 'key' || e.code === 'nokey' || e.code === 'model') {
+          addSys('토론을 시작하지 못했습니다. ' + e.message, 'warn', { label: '⚙️ 설정 열기', act: 'settings' });
+        } else {
+          addSys('토론을 끝내지 못했습니다: ' + e.message, 'warn');
+        }
+        if (e.code === 'net' || e.code === 'nokey' || e.code === 'auth') {
+          addSys('키 없이 흐름을 먼저 보시려면 아래 [▶ 데모 시연해 보기]를 눌러 보세요.');
+        }
+      }
+    } finally {
+      setBusy(false);
+      state.ctrl = null;
+      refreshModeNote();
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 데모                                                                */
+  /* ------------------------------------------------------------------ */
+  function pickPreset(q) {
+    const list = window.AIDJ_DEMO || [];
+    if (!list.length) return null;
+    const s = String(q || '');
+    if (/유튜브|영상|촬영|구독/.test(s)) return list.find((p) => p.id === 'youtube') || list[0];
+    if (/블로그|칼럼|연재|명리|사주|상담/.test(s)) return list.find((p) => p.id === 'column') || list[0];
+    if (/낭송|수업|커리큘럼|강의|시낭송/.test(s)) return list.find((p) => p.id === 'class') || list[0];
+    return list[0];
+  }
+
+  async function runPreset(preset) {
+    if (state.running) { toast('지금 토론이 진행 중입니다.'); return; }
+    if (!preset) return;
+    if (available().length === 0) {
+      // 데모 모드: 질문을 그대로 올리고 예시로 진행
+      await startDebate(preset.question);
+      return;
+    }
+    // 키가 있으면 같은 질문을 실제 토론으로 보낸다
+    await startDebate(preset.question);
+  }
+
+  async function runDemo(preset, userQ) {
+    if (!preset) { addSys('데모 준비가 없습니다.', 'warn'); return; }
+    state.ctrl = new AbortController();
+    state.cancelled = false;
+    state.lastDemo = true;
+    state.mode = 'demo';
+    setBusy(true);
+    $('demoChip').hidden = false;
+    addSys('데모 시연입니다. 실제 AI 응답이 아니라, 이 단톡방이 어떻게 돌아가는지 보여 드리기 위해 미리 준비한 예시 대화입니다.', 'warn');
+    if (userQ && userQ !== preset.question) {
+      addSys('입력하신 질문 대신 준비된 예시 「' + preset.title + '」로 진행합니다. 입력하신 질문은 키를 넣은 뒤 다시 보내 주세요.');
+    }
+
+    let lastFinalEl = null;
+    try {
+      for (const step of preset.script) {
+        if (state.cancelled) throw cancelErr();
+        if (step.type === 'round') {
+          setRound(step.n);
+          if (step.n === 1) setStatus('1라운드 · 팀원들이 답하는 중 (데모)', 'busy demo');
+          if (step.n === 2) setStatus('2라운드 · 상호 검토 중 (데모)', 'busy demo');
+          if (step.n === 3) setStatus('3라운드 · 대장 최종 정리 중 (데모)', 'busy demo');
+          addRoundLine(step.n, step.label);
+          if (!(await waitC(420))) throw cancelErr();
+        } else if (step.type === 'msg') {
+          setMemberState(step.from, 'active');
+          setStatus((step.from === 'leader' ? '클로드 대장' : MEMBERS[step.from].name) + ' 작성 중 (데모)', 'busy demo');
+          const tb = typingBubble(step.from);
+          if (!(await waitC(Math.min(1700, 480 + step.text.length * 3.2)))) { tb.remove(); throw cancelErr(); }
+          tb.remove();
+          addMsg({ from: step.from, text: step.text, round: currentRound(), demo: true });
+          setMemberState(step.from, 'done');
+          if (!(await waitC(320))) throw cancelErr();
+        } else if (step.type === 'final') {
+          setMemberState('leader', 'active');
+          const tb = typingBubble('leader');
+          if (!(await waitC(1500))) { tb.remove(); throw cancelErr(); }
+          tb.remove();
+          state.lastFinal = step.text;
+          const fm = addMsg({ from: 'leader', kind: 'final', text: step.text, round: 3, demo: true });
+          setMemberState('leader', 'done');
+          lastFinalEl = fm;
+        }
+      }
+      setRound(0, true);
+      setStatus('완료 · 데모 초안 도착', 'done');
+      toast('데모 끝입니다. 복사·매뉴얼 저장까지 그대로 해 보세요.');
+      focusFinal(lastFinalEl);
+    } catch (e) {
+      if (e.code === 'cancel') {
+        addSys('데모를 멈췄습니다.', 'warn');
+        setStatus('중단됨', '');
+      } else {
+        addSys('데모 중 문제가 생겼습니다: ' + e.message, 'warn');
+      }
+    } finally {
+      setBusy(false);
+      state.ctrl = null;
+      refreshModeNote();
+    }
+  }
+
+  function currentRound() { return state.round || 1; }
+
+  function focusFinal(el) {
+    if (!el) { scrollDown(true); return; }
+    requestAnimationFrame(() => {
+      const top = el.getBoundingClientRect().top - chat.getBoundingClientRect().top + chat.scrollTop - 10;
+      chat.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      autoScroll = false;
+    });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 복사 · 매뉴얼                                                        */
+  /* ------------------------------------------------------------------ */
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+      throw new Error('fallback');
+    } catch (e) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        ta.remove();
+        return ok;
+      } catch (e2) { return false; }
+    }
+  }
+
+  function manualTitle(q) {
+    const t = String(q || state.currentQ || '질문').replace(/\s+/g, ' ').trim();
+    return t.length > 34 ? t.slice(0, 34) + '…' : t;
+  }
+
+  function buildManual(qidArg, finalArg) {
+    const qid = qidArg || state.lastQid;
+    const msgs = state.thread.filter((m) => m.qid === qid);
+    const qMsg = msgs.filter((m) => m.from === 'me').pop();
+    const q = (qMsg && qMsg.text) || state.currentQ || '(질문 없음)';
+    const final = finalArg || ((msgs.filter((m) => m.kind === 'final').pop() || {}).text || '') || state.lastFinal;
+    const isDemo = msgs.some((m) => m.demo) || state.lastDemo;
+    const r1 = msgs.filter((m) => m.round === 1 && m.from !== 'me');
+    const r2 = msgs.filter((m) => m.round === 2 && m.from !== 'me');
+    const pfMsgs = msgs.filter((m) => m.from === 'pf');
+    const date = new Date();
+    const day = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0') + ' ' +
+      String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+
+    let md = '# ' + manualTitle() + '\n\n';
+    md += '> AI 대장 단톡방 매뉴얼 · ' + day + (isDemo ? ' · **데모 시연**' : '') + '\n';
+    md += '> 팀: 클로드 대장 · 연과장 · 챗주임 · 퍼대리 · 제미니 팀원\n\n';
+    md += '## 1. 질문\n' + q + '\n\n';
+    const atts = (qMsg && Array.isArray(qMsg.files)) ? qMsg.files : [];
+    if (atts.length) md += '### 첨부 파일\n' + atts.map((f) => '- ' + f.name + (f.chars ? ' (' + Number(f.chars).toLocaleString('ko-KR') + '자)' : '')).join('\n') + '\n\n';
+    const finalMd = (final || '(아직 최종 초안이 없습니다)').replace(/^##\s+/gm, '### ');
+    md += '## 2. 최종 결론 (클로드 대장 초안)\n' + finalMd + '\n\n';
+    md += '## 3. 근거·출처 (퍼대리 확인)\n';
+    if (pfMsgs.length) md += pfMsgs.map((m) => '### 퍼대리 (' + (m.round === 1 ? '1라운드' : '2라운드 보완') + ')\n' + m.text).join('\n\n') + '\n\n';
+    else md += '- (근거 담당 응답 없음)\n\n';
+    md += '## 4. 팀원별 1차 의견\n';
+    if (r1.length) md += r1.map((m) => '### ' + MEMBERS[m.from].name + '\n' + m.text).join('\n\n') + '\n\n';
+    else md += '- (기록 없음)\n\n';
+    md += '## 5. 상호 검토 기록\n';
+    if (r2.length) md += r2.map((m) => '### ' + MEMBERS[m.from].name + '\n' + m.text).join('\n\n') + '\n\n';
+    else md += '- (기록 없음)\n\n';
+    md += '---\n\n## 사용 안내\n- 이 문서는 AI 토론 초안입니다. 그대로 배포하기 전에 사실관계와 수치를 원문으로 확인하세요.\n';
+    if (isDemo) md += '- **이 매뉴얼은 데모 시연에서 나온 예시입니다.** 실제 질문에 대한 답이 아닙니다.\n';
+    md += '- 저장 위치: 이 브라우저의 매뉴얼 보관함(localStorage)과 내려받은 .md 파일\n';
+    return md;
+  }
+
+  function downloadText(filename, text) {
+    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+  }
+
+  function safeName(s) {
+    return String(s).replace(/[…·]/g, ' ').replace(/[\\/:*?"<>|\n\r]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40) || 'AI토론';
+  }
+
+  function saveManual(qidArg, finalArg) {
+    const md = buildManual(qidArg, finalArg);
+    const d = new Date();
+    const stamp = '' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '_' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+    const item = {
+      id: uid(),
+      title: manualTitle((state.thread.filter((m) => m.qid === (qidArg || state.lastQid) && m.from === 'me').pop() || {}).text),
+      created: Date.now(),
+      demo: /데모 시연에서 나온 예시/.test(md),
+      md: md
+    };
+    state.manuals.unshift(item);
+    if (state.manuals.length > 60) state.manuals.length = 60;
+    saveJSON(LS.manuals, state.manuals);
+    renderManuals();
+    downloadText('AI토론_매뉴얼_' + stamp + '_' + safeName(item.title) + '.md', md);
+    toast('보관함에 저장하고 .md 파일을 내려받았습니다.');
+    openDrawer();
+  }
+
+  function renderManuals() {
+    const box = $('manualList');
+    box.innerHTML = '';
+    if (!state.manuals.length) {
+      box.innerHTML = '<div class="manual-empty">아직 저장한 매뉴얼이 없습니다.<br>토론이 끝나면 <b>[📄 매뉴얼로 저장]</b>을 눌러 보세요.</div>';
+      return;
+    }
+    state.manuals.forEach((m) => {
+      const d = document.createElement('div');
+      d.className = 'manual-item';
+      const dt = new Date(m.created);
+      const when = (dt.getMonth() + 1) + '/' + dt.getDate() + ' ' + String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+      d.innerHTML = '<div class="mi-title">' + esc(m.title) + '</div>' +
+        '<div class="mi-meta">' + esc(when) + (m.demo ? ' · 데모' : '') + '</div>' +
+        '<div class="mi-actions"><button class="btn small" data-view="' + m.id + '">열기</button>' +
+        '<button class="btn small ghost" data-dl="' + m.id + '">.md</button>' +
+        '<button class="btn small ghost" data-del="' + m.id + '">삭제</button></div>';
+      box.appendChild(d);
+    });
+  }
+
+  function openManual(id) {
+    const m = state.manuals.find((x) => x.id === id);
+    if (!m) return;
+    $('viewBody').innerHTML = renderMd(m.md);
+    $('viewTitle').textContent = '📄 ' + m.title;
+    $('viewModal').hidden = false;
+    $('viewModal').dataset.id = id;
+    document.body.style.overflow = 'hidden';
+  }
+  function closeManual() {
+    $('viewModal').hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 설정                                                                */
+  /* ------------------------------------------------------------------ */
+  function openSettings() {
+    const s = state.settings;
+    ['anthropic', 'openai', 'gemini', 'perplexity'].forEach((p) => {
+      const el = $('key_' + p);
+      el.value = s.keys[p] || '';
+      el.type = 'password';
+      const st = $('st_' + p);
+      st.textContent = (s.keys[p] || '').trim() ? '저장됨' : '없음';
+      st.style.color = (s.keys[p] || '').trim() ? 'var(--ok)' : 'var(--ink3)';
+      $('model_' + p).value = s.models[p] || DEFAULTS.models[p];
+    });
+    $('multiToggle').checked = !!s.multiPersona;
+    $('fallbackToggle').checked = !!s.autoFallback;
+    $('delegateSel').value = s.delegateEngine || 'auto';
+    $('yeonjiSel').value = s.yeonjiEngine || 'auto';
+    $('proxyInput').value = s.proxy || '';
+    $('settingsModal').hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSettings() {
+    // 입력창에 키가 적혀 있는데 저장 버튼을 안 누르고 닫아도 자동 반영
+    let changed = false;
+    ['anthropic', 'openai', 'gemini', 'perplexity'].forEach((p) => {
+      const el = $('key_' + p);
+      if (!el) return;
+      const v = (el.value || '').trim();
+      if (v !== (state.settings.keys[p] || '').trim()) {
+        state.settings.keys[p] = v;
+        changed = true;
+      }
+    });
+    if (changed) {
+      saveJSON(LS.settings, state.settings);
+      refreshModeNote();
+      const n = available().length;
+      if (n) toast('입력한 API 키를 자동 저장했습니다. (' + modeSummary() + ')');
+    }
+    $('settingsModal').hidden = true;
+    document.body.style.overflow = '';
+  }
+  function saveSettings() {
+    const s = state.settings;
+    ['anthropic', 'openai', 'gemini', 'perplexity'].forEach((p) => {
+      s.keys[p] = ($('key_' + p).value || '').trim();
+      s.models[p] = (($('model_' + p).value || '').trim()) || DEFAULTS.models[p];
+    });
+    s.multiPersona = $('multiToggle').checked;
+    s.autoFallback = $('fallbackToggle').checked;
+    s.delegateEngine = $('delegateSel').value;
+    s.yeonjiEngine = $('yeonjiSel').value;
+    s.proxy = ($('proxyInput').value || '').trim();
+    saveJSON(LS.settings, s);
+    refreshModeNote();
+    closeSettings();
+    const n = available().length;
+    toast(n ? '저장했습니다. 사용 가능한 엔진 ' + n + '개.' : '저장했습니다. 키가 없어 지금은 데모만 됩니다.');
+    if (n && !state.running) addSys('엔진 설정을 저장했습니다. 이제 질문을 보내면 실제 AI가 답합니다. (' + modeSummary() + ')');
+  }
+  function modeSummary() {
+    const m = decideMode();
+    if (m === 'full') return '4개 엔진 모드';
+    if (m === 'multi') {
+      const a = available();
+      const p = state.settings.delegateEngine !== 'auto' && a.indexOf(state.settings.delegateEngine) >= 0 ? state.settings.delegateEngine : autoDelegate();
+      return PROV[p].label + ' 대행 모드';
+    }
+    return '데모';
+  }
+
+  async function testProvider(p) {
+    const key = ($('key_' + p).value || '').trim();
+    const st = $('st_' + p);
+    if (!key) { st.textContent = '키를 입력하세요'; st.style.color = 'var(--warn)'; return; }
+    const backup = state.settings.keys[p];
+    state.settings.keys[p] = key;
+    st.textContent = '확인 중…'; st.style.color = 'var(--ink3)';
+    try {
+      const out = await callProvider(p, { system: '너는 연결 확인용 도우미다. 짧게 답한다.', user: '연결 확인. "연결됨"이라고만 답하세요.', maxTokens: 20, temperature: 0, timeoutMs: 30000 });
+      st.textContent = '정상 ✓ 자동저장됨 · ' + (out || '').slice(0, 10);
+      st.style.color = 'var(--ok)';
+      saveJSON(LS.settings, state.settings);
+      refreshModeNote();
+      toast(PROV[p].label + ' 연결 확인 및 자동 저장 완료! (' + modeSummary() + ')');
+    } catch (e) {
+      state.settings.keys[p] = backup;
+      st.textContent = e.message.replace(/^[^:]{1,20}:\s*/, '').slice(0, 60);
+      st.style.color = 'var(--warn)';
+      st.title = e.message;
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 보관함 드로어                                                        */
+  /* ------------------------------------------------------------------ */
+  function openDrawer() {
+    if (window.matchMedia('(min-width:961px)').matches) return;
+    $('drawer').classList.add('open');
+    $('scrim').hidden = false;
+  }
+  function closeDrawer() {
+    $('drawer').classList.remove('open');
+    $('scrim').hidden = true;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 파일 첨부 (TXT · DOCX)                                              */
+  /* ------------------------------------------------------------------ */
+  const ATTACH = { budget: 25000, maxFiles: 5, maxBytes: 20 * 1024 * 1024 };
+  const DEFAULT_Q = '첨부한 파일 내용을 검토해 주세요.';
+  let files = [];
+
+  /* TXT — UTF-8을 먼저 읽고, 깨지면 euc-kr(CP949)로 다시 읽는다 */
+  function decodeTxt(buf) {
+    const u8 = new Uint8Array(buf);
+    if (u8.length >= 2 && u8[0] === 0xFF && u8[1] === 0xFE) return new TextDecoder('utf-16le').decode(u8);
+    if (u8.length >= 2 && u8[0] === 0xFE && u8[1] === 0xFF) return new TextDecoder('utf-16be').decode(u8);
+    if (u8.length >= 3 && u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) return new TextDecoder('utf-8').decode(u8);
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); }
+    catch (e) { /* UTF-8이 아니면 한글 옛 문서(euc-kr)로 다시 읽는다 */ }
+    try { return new TextDecoder('euc-kr').decode(u8); }
+    catch (e) { return new TextDecoder('utf-8').decode(u8); }
+  }
+
+  /* DOCX — ZIP 중앙 디렉터리에서 word/document.xml 하나만 꺼낸다 (외부 라이브러리 없음) */
+  function zipFindEntry(buf, match) {
+    const dv = new DataView(buf);
+    const u8 = new Uint8Array(buf);
+    let eocd = -1;
+    const min = Math.max(0, u8.length - 66000);
+    for (let i = u8.length - 22; i >= min; i--) {
+      if (u8[i] === 0x50 && u8[i + 1] === 0x4b && u8[i + 2] === 0x05 && u8[i + 3] === 0x06) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('DOCX 압축 구조를 찾지 못했습니다. 워드에서 .docx로 저장해 올려 주세요.');
+    const count = dv.getUint16(eocd + 10, true);
+    let p = dv.getUint32(eocd + 16, true);
+    for (let n = 0; n < count; n++) {
+      if (p + 46 > u8.length) break;
+      if (u8[p] !== 0x50 || u8[p + 1] !== 0x4b || u8[p + 2] !== 0x01 || u8[p + 3] !== 0x02) break;
+      const method = dv.getUint16(p + 10, true);
+      const compSize = dv.getUint32(p + 20, true);
+      const nameLen = dv.getUint16(p + 28, true);
+      const extraLen = dv.getUint16(p + 30, true);
+      const commLen = dv.getUint16(p + 32, true);
+      const localOff = dv.getUint32(p + 42, true);
+      const name = new TextDecoder('utf-8').decode(u8.subarray(p + 46, p + 46 + nameLen));
+      if (match(name)) {
+        if (u8[localOff] !== 0x50 || u8[localOff + 1] !== 0x4b || u8[localOff + 2] !== 0x03 || u8[localOff + 3] !== 0x04) throw new Error('DOCX 압축 구조가 손상되었습니다.');
+        const lNameLen = dv.getUint16(localOff + 26, true);
+        const lExtraLen = dv.getUint16(localOff + 28, true);
+        const start = localOff + 30 + lNameLen + lExtraLen;
+        const end = compSize ? Math.min(u8.length, start + compSize) : u8.length;
+        return { method: method, data: u8.subarray(start, end), name: name };
+      }
+      p += 46 + nameLen + extraLen + commLen;
+    }
+    return null;
+  }
+
+  async function inflateRaw(u8) {
+    if (typeof DecompressionStream === 'undefined') throw new Error('이 브라우저는 DOCX 압축 풀기를 지원하지 않습니다. 워드에서 TXT로 저장해 올려 주세요.');
+    const stream = new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    const out = await new Response(stream).arrayBuffer();
+    return new Uint8Array(out);
+  }
+
+  function docxXmlToText(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('DOCX 본문(XML)을 해석하지 못했습니다.');
+    const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    let ps = Array.prototype.slice.call(doc.getElementsByTagNameNS(W, 'p'));
+    if (!ps.length) ps = Array.prototype.slice.call(doc.getElementsByTagName('w:p'));
+    if (!ps.length) {
+      const ts = doc.getElementsByTagNameNS(W, 't');
+      return Array.prototype.slice.call(ts).map((t) => t.textContent).join('');
+    }
+    const lines = [];
+    ps.forEach((p) => {
+      let a = p.parentNode, nested = false;
+      while (a && a.nodeType === 1) { if (a.localName === 'p') { nested = true; break; } a = a.parentNode; }
+      if (nested) return;
+      let s = '';
+      const walk = function (node) {
+        const kids = node.childNodes || [];
+        for (let i = 0; i < kids.length; i++) {
+          const c = kids[i];
+          if (c.nodeType !== 1) continue;
+          const ln = c.localName;
+          if (ln === 't') s += c.textContent;
+          else if (ln === 'tab') s += '\t';
+          else if (ln === 'br' || ln === 'cr') s += '\n';
+          else if (ln === 'instrText' || ln === 'delText' || ln === 'pPr' || ln === 'rPr' || ln === 'p') continue;
+          else walk(c);
+        }
+      };
+      walk(p);
+      lines.push(s.replace(/[ \t]+$/, ''));
+    });
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+/, '').replace(/\s+$/, '');
+  }
+
+  async function parseDocx(file) {
+    const buf = await file.arrayBuffer();
+    const entry = zipFindEntry(buf, function (n) { return n.toLowerCase() === 'word/document.xml'; });
+    if (!entry) throw new Error('이 파일 안에서 DOCX 본문을 찾지 못했습니다. 워드에서 .docx로 저장해 올려 주세요.');
+    let bytes;
+    if (entry.method === 0) bytes = entry.data;
+    else if (entry.method === 8) bytes = await inflateRaw(entry.data);
+    else throw new Error('지원하지 않는 DOCX 압축 방식입니다(' + entry.method + '). 워드에서 .docx로 다시 저장해 주세요.');
+    const xmlText = new TextDecoder('utf-8').decode(bytes).replace(/^\uFEFF/, '');
+    const text = docxXmlToText(xmlText);
+    if (!text.trim()) throw new Error('DOCX에서 글자를 찾지 못했습니다. 스캔 이미지만 득은 문서는 읽지 못합니다.');
+    return text;
+  }
+
+  /* 질문 + 첨부 본문 → AI에 보낼 글 (본문 상한 25,000자) */
+  function attachmentBlock(question, list) {
+    if (!list || !list.length) return { text: question, used: 0, total: 0, truncated: false };
+    let left = ATTACH.budget;
+    const total = list.reduce(function (a, f) { return a + (f.text ? f.text.length : 0); }, 0);
+    const parts = [];
+    list.forEach(function (f, i) {
+      const body = f.text || '';
+      const head = '--- 파일 ' + (i + 1) + ': ' + f.name + ' ---';
+      if (left <= 0) {
+        parts.push(head + '\n(25,000자 상한에 걸려 이 파일의 본문은 넣지 않았습니다. 원문 ' + body.length.toLocaleString('ko-KR') + '자)');
+        return;
+      }
+      if (body.length > left) {
+        parts.push(head + '\n(원문 ' + body.length.toLocaleString('ko-KR') + '자 중 앞 ' + left.toLocaleString('ko-KR') + '자만 전달)\n' + body.slice(0, left) + '\n…(이하 생략)');
+        left = 0;
+      } else {
+        parts.push(head + '\n' + body);
+        left -= body.length;
+      }
+    });
+    return {
+      text: question + '\n\n[첨부 파일 본문]\n' + parts.join('\n\n'),
+      used: Math.min(ATTACH.budget, total),
+      total: total,
+      truncated: total > ATTACH.budget
+    };
+  }
+
+  function renderAttachments() {
+    const box = $('attachList');
+    box.innerHTML = '';
+    box.hidden = files.length === 0;
+    const total = files.reduce(function (a, f) { return a + (f.chars || 0); }, 0);
+    files.forEach(function (f) {
+      const d = document.createElement('div');
+      d.className = 'file-chip';
+      d.innerHTML = '<span>📄</span><span class="fc-name" title="' + esc(f.name) + '">' + esc(f.name) + '</span>' +
+        '<span class="fc-meta">' + Number(f.chars || 0).toLocaleString('ko-KR') + '자</span>' +
+        '<button class="fc-x" type="button" data-rm="' + esc(f.id) + '" aria-label="' + esc(f.name) + ' 첨부 삭제">✕</button>';
+      box.appendChild(d);
+    });
+    const hint = $('attachHint');
+    if (files.length) {
+      hint.textContent = '첨부 ' + files.length + '개 · ' + total.toLocaleString('ko-KR') + '자' + (total > ATTACH.budget ? ' · 25,000자까지만 전달' : '');
+    } else {
+      hint.textContent = 'TXT·DOCX 파일을 올리면 AI가 함께 읽습니다';
+    }
+    input.placeholder = files.length ? '질문을 입력하세요 (비워 두면 “첨부한 파일을 검토해 주세요”로 시작)' : '질문을 입력하세요';
+  }
+
+  function clearAttachments() {
+    files = [];
+    renderAttachments();
+  }
+
+  async function addFiles(list) {
+    if (!list || !list.length) return;
+    if (state.running) { toast('토론 중에는 파일을 추가할 수 없습니다.'); return; }
+    let added = 0;
+    for (const f of list) {
+      if (files.length >= ATTACH.maxFiles) { toast('파일은 한 번에 ' + ATTACH.maxFiles + '개까지 올릴 수 있습니다.'); break; }
+      const name = f.name || '이름 없는 파일';
+      const ext = (name.indexOf('.') >= 0 ? name.split('.').pop() : '').toLowerCase();
+      if (ext === 'doc') { toast(name + ' — 옛 워드(.doc) 형식은 읽지 못합니다. 워드에서 .docx로 저장해 올려 주세요.'); continue; }
+      if (ext !== 'txt' && ext !== 'docx') { toast(name + ' — TXT와 DOCX 파일만 올릴 수 있습니다.'); continue; }
+      if (f.size > ATTACH.maxBytes) { toast(name + ' — 파일이 너무 큽니다(20MB까지).'); continue; }
+      try {
+        const raw = ext === 'docx' ? await parseDocx(f) : decodeTxt(await f.arrayBuffer());
+        const text = String(raw || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+        if (!text.trim()) { toast(name + ' — 본문이 비어 있습니다. 스캔 이미지로 된 문서는 글자를 읽지 못합니다.'); continue; }
+        files.push({ id: uid(), name: name, ext: ext, text: text, chars: text.length, size: f.size });
+        added++;
+      } catch (err) {
+        toast(name + ' — ' + ((err && err.message) || '파일을 읽지 못했습니다.'));
+      }
+    }
+    renderAttachments();
+    if (added) toast('파일 ' + added + '개를 붙였습니다. 질문과 함께 보내면 AI들이 그 내용까지 읽습니다.');
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 입력                                                                */
+  /* ------------------------------------------------------------------ */
+  function autosize() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 168) + 'px';
+  }
+
+  async function send() {
+    if (state.running) { toast('이미 토론이 진행 중입니다. [중단]을 누르면 멈춥니다.'); return; }
+    const q = input.value.trim();
+    const chosen = files.slice();
+    if (!q && !chosen.length) { input.focus(); toast('질문을 입력하거나 📎 파일 첨부로 TXT·DOCX 파일을 올려 주세요.'); return; }
+    const question = q || DEFAULT_Q;
+    input.value = '';
+    autosize();
+    clearAttachments();
+    await startDebate(question, chosen);
+  }
+
+  function stop() {
+    if (!state.running) return;
+    state.cancelled = true;
+    setStatus('중단 중…', '');
+    if (state.ctrl) { try { state.ctrl.abort(); } catch (e) {} }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* 이벤트                                                              */
+  /* ------------------------------------------------------------------ */
+  function bind() {
+    $('sendBtn').addEventListener('click', send);
+    $('stopBtn').addEventListener('click', stop);
+    $('attachBtn').addEventListener('click', () => {
+      if (state.running) { toast('토론 중에는 파일을 추가할 수 없습니다.'); return; }
+      $('attachInput').click();
+    });
+    $('attachInput').addEventListener('change', async (e) => {
+      const list = Array.prototype.slice.call(e.target.files || []);
+      e.target.value = '';
+      await addFiles(list);
+    });
+    $('attachList').addEventListener('click', (e) => {
+      const x = e.target.closest('[data-rm]');
+      if (!x) return;
+      files = files.filter((f) => f.id !== x.dataset.rm);
+      renderAttachments();
+    });
+    $('demoBtn').addEventListener('click', () => {
+      const first = (window.AIDJ_DEMO || [])[0];
+      if (first) runPreset(first);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+    });
+    input.addEventListener('input', autosize);
+
+    $('themeBtn').addEventListener('click', () => {
+      state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark';
+      applyTheme(); saveJSON(LS.settings, state.settings);
+    });
+    $('fontBtn').addEventListener('click', cycleScale);
+    $('settingsBtn').addEventListener('click', openSettings);
+    $('newBtn').addEventListener('click', () => {
+      if (state.running) { toast('토론 중에는 새 대화를 시작할 수 없습니다.'); return; }
+      if (!state.thread.length) { toast('이미 빈 대화입니다.'); return; }
+      if (!confirm('대화 화면을 지우고 새로 시작할까요?\n(저장한 매뉴얼은 보관함에 그대로 남습니다)')) return;
+      state.thread = []; saveJSON(LS.thread, state.thread);
+      state.lastFinal = ''; state.currentQ = ''; state.lastDemo = false; state.lastQid = null;
+      resetMembers(); setRound(0); setStatus('대기 중', '');
+      chat.innerHTML = ''; addDayLine(); greeting(); refreshModeNote(); clearAttachments();
+    });
+
+    chat.addEventListener('scroll', () => {
+      const gap = chat.scrollHeight - chat.scrollTop - chat.clientHeight;
+      autoScroll = gap < 120;
+    });
+    chat.addEventListener('click', async (e) => {
+      const act = e.target.closest('[data-act]');
+      if (act) { if (act.dataset.act === 'settings') openSettings(); return; }
+      const copyBtn = e.target.closest('[data-copy-final]');
+      if (copyBtn) {
+        const card = copyBtn.closest('.final');
+        const body = card ? card.querySelector('.final-body') : null;
+        const text = copyBtn._final || (body ? body.innerText : '') || state.lastFinal;
+        const ok = await copyText(text);
+        toast(ok ? '최종 초안을 복사했습니다.' : '복사하지 못했습니다. 글자를 길게 눌러 직접 복사해 주세요.');
+        return;
+      }
+      const sb = e.target.closest('[data-save-manual]');
+      if (sb) { saveManual(sb._qid || state.qid, sb._final || ''); return; }
+    });
+
+    $('manualList').addEventListener('click', (e) => {
+      const v = e.target.closest('[data-view]'), d = e.target.closest('[data-dl]'), x = e.target.closest('[data-del]');
+      if (v) { openManual(v.dataset.view); closeDrawer(); }
+      else if (d) {
+        const m = state.manuals.find((mm) => mm.id === d.dataset.dl);
+        if (m) { downloadText('AI토론_매뉴얼_' + safeName(m.title) + '.md', m.md); toast('.md 파일을 내려받았습니다.'); }
+      } else if (x) {
+        if (!confirm('이 매뉴얼을 보관함에서 지울까요?')) return;
+        state.manuals = state.manuals.filter((mm) => mm.id !== x.dataset.del);
+        saveJSON(LS.manuals, state.manuals); renderManuals(); toast('지웠습니다.');
+      }
+    });
+
+    $('menuBtn').addEventListener('click', openDrawer);
+    $('drawerClose').addEventListener('click', closeDrawer);
+    $('scrim').addEventListener('click', closeDrawer);
+
+    $('setClose').addEventListener('click', closeSettings);
+    $('setCancel').addEventListener('click', closeSettings);
+    $('setSave').addEventListener('click', saveSettings);
+    $('settingsModal').addEventListener('click', (e) => { if (e.target === $('settingsModal')) closeSettings(); });
+    document.querySelectorAll('[data-eye]').forEach((b) => b.addEventListener('click', () => {
+      const el = $('key_' + b.dataset.eye);
+      el.type = el.type === 'password' ? 'text' : 'password';
+      b.textContent = el.type === 'password' ? '보기' : '숨기기';
+    }));
+    document.querySelectorAll('[data-test]').forEach((b) => b.addEventListener('click', () => testProvider(b.dataset.test)));
+
+    $('clearThread').addEventListener('click', () => {
+      if (!confirm('대화 기록을 지울까요? 보관함의 매뉴얼은 남습니다.')) return;
+      state.thread = []; state.lastFinal = ''; state.currentQ = ''; state.lastDemo = false;
+      saveJSON(LS.thread, state.thread);
+      chat.innerHTML = ''; addDayLine(); greeting(); resetMembers(); setRound(0); setStatus('대기 중', ''); refreshModeNote(); clearAttachments();
+      toast('대화 기록을 지웠습니다.');
+    });
+    $('clearManuals').addEventListener('click', () => {
+      if (!confirm('보관함의 매뉴얼을 모두 지울까요? 되돌릴 수 없습니다.')) return;
+      state.manuals = []; saveJSON(LS.manuals, state.manuals); renderManuals(); toast('보관함을 비웠습니다.');
+    });
+    $('resetSettings').addEventListener('click', () => {
+      if (!confirm('키·모델·화면 설정을 모두 초기화할까요?')) return;
+      state.settings = deepMerge(DEFAULTS, {});
+      saveJSON(LS.settings, state.settings);
+      applyTheme(); applyScale(); openSettings(); refreshModeNote(); toast('설정을 초기화했습니다.');
+    });
+
+    $('viewClose').addEventListener('click', closeManual);
+    $('viewModal').addEventListener('click', (e) => { if (e.target === $('viewModal')) closeManual(); });
+    $('viewCopy').addEventListener('click', async () => {
+      const m = state.manuals.find((x) => x.id === $('viewModal').dataset.id);
+      if (!m) return;
+      const ok = await copyText(m.md);
+      toast(ok ? '매뉴얼을 복사했습니다.' : '복사하지 못했습니다.');
+    });
+    $('viewDownload').addEventListener('click', () => {
+      const m = state.manuals.find((x) => x.id === $('viewModal').dataset.id);
+      if (!m) return;
+      downloadText('AI토론_매뉴얼_' + safeName(m.title) + '.md', m.md);
+      toast('.md 파일을 내려받았습니다.');
+    });
+    $('viewDelete').addEventListener('click', () => {
+      const id = $('viewModal').dataset.id;
+      if (!confirm('이 매뉴얼을 지울까요?')) return;
+      state.manuals = state.manuals.filter((x) => x.id !== id);
+      saveJSON(LS.manuals, state.manuals); renderManuals(); closeManual(); toast('지웠습니다.');
+    });
+
+    $('helpClose').addEventListener('click', closeHelp);
+    $('helpOk').addEventListener('click', closeHelp);
+    $('helpModal').addEventListener('click', (e) => { if (e.target === $('helpModal')) closeHelp(); });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (!$('helpModal').hidden) closeHelp();
+        else if (!$('viewModal').hidden) closeManual();
+        else if (!$('settingsModal').hidden) closeSettings();
+        else closeDrawer();
+      }
+    });
+  }
+
+  function openHelp() {
+    $('helpModal').hidden = false;
+    document.body.style.overflow = 'hidden';
+    state.settings.helpSeen = true;
+    saveJSON(LS.settings, state.settings);
+  }
+  function closeHelp() { $('helpModal').hidden = true; document.body.style.overflow = ''; }
+
+  /* ------------------------------------------------------------------ */
+  /* 시작                                                                */
+  /* ------------------------------------------------------------------ */
+  function init() {
+    applyTheme();
+    applyScale();
+    renderRoster();
+    renderChips();
+    renderManuals();
+    renderAttachments();
+    refreshModeNote();
+    bind();
+    renderThread();
+    if (state.thread.length) {
+      const last = state.thread.filter((m) => m.from === 'me').pop();
+      if (last) { state.currentQ = last.text; state.lastQid = last.qid; }
+      const f = state.thread.filter((m) => m.kind === 'final').pop();
+      if (f) { state.lastFinal = f.text; state.lastDemo = !!f.demo; }
+    }
+    autosize();
+    // 데스크톱에서는 보관함이 늘 보이므로 스크림 없음
+    if (window.matchMedia('(min-width:961px)').matches) { $('scrim').hidden = true; }
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
