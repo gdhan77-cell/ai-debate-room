@@ -1569,20 +1569,20 @@ window.AIDJ_DEMO = [
   /* 질문 프롬프트                                                        */
   /* ------------------------------------------------------------------ */
   function pRound1(q, k) {
-    return '[사용자 질문]\n' + q + '\n\n[지시]\n위 질문에 ' + MEMBERS[k].name + '의 역할 관점에서만 답하세요.\n- 5~9문장. 번호나 줄바꿈으로 읽기 쉽게.\n- 인사말·자기소개 없이 본론부터.\n- 확실하지 않은 수치·출처는 "확인 필요"라고 표시.\n- 다른 팀원을 언급하지 말고 자기 의견만 쓰세요.';
+    return '[사용자 질문]\n' + q + '\n\n[지시]\n위 질문에 ' + MEMBERS[k].name + '의 역할 관점에서 깊이 있게 답하세요.\n- 질문과 첨부 자료의 맥락에 맞게 충분히 상세하고 구체적으로 작성하세요(번호·소제목·줄바꿈으로 읽기 쉽게).\n- 원고나 자료가 첨부된 경우, 막연한 총평 대신 실제 문장·장면·수치를 직접 인용해 근거를 대세요.\n- 인사말·자기소개 없이 본론부터.\n- 확실하지 않은 수치·출처는 "확인 필요"라고 표시.\n- 다른 팀원을 언급하지 말고 자기 의견만 쓰세요.';
   }
   function pRound2Leader(q, answers) {
     const list = ORDER.map((k) => '[' + MEMBERS[k].name + ']\n' + (answers[k] || '(응답 없음)')).join('\n\n');
-    return '[사용자 질문]\n' + q + '\n\n[1라운드 팀원 답변]\n' + list + '\n\n[지시]\n대장으로서 다음을 하세요.\n1) 서로 어긋나는 점(시간·수치·순서·결론)을 구체적으로 짚기\n2) 근거가 약하거나 지어낸 듯한 주장 지적\n3) 빠진 관점 지적\n4) 각 팀원에게 재확인 질문을 이름을 붙여 던지기\n5~8문장, 인사 없이.';
+    return '[사용자 질문]\n' + q + '\n\n[1라운드 팀원 답변]\n' + list + '\n\n[지시]\n대장으로서 다음을 구체적으로 짚으세요.\n1) 서로 어긋나는 점(시간·수치·순서·해석·결론)\n2) 근거가 약하거나 원문과 맞지 않는 주장\n3) 빠진 핵심 관점이나 더 파고들어야 할 대목\n4) 각 팀원에게 이름을 붙여 날카로운 재확인 질문 던지기\n충분한 분량으로 구체적으로, 인사 없이 본론부터.';
   }
   function pRound2Member(q, k, my, critique) {
-    return '[질문]\n' + q + '\n\n[내 1라운드 답변]\n' + (my || '') + '\n\n[대장의 지적]\n' + critique + '\n\n[지시]\n지적받은 부분만 3~5문장으로 보완하거나 반박하세요. 동의하면 수정안을, 아니면 근거를 들어 반박하세요. 다른 팀원 이야기는 하지 마세요.';
+    return '[질문]\n' + q + '\n\n[내 1라운드 답변]\n' + (my || '') + '\n\n[대장의 지적]\n' + critique + '\n\n[지시]\n지적받은 부분을 원고·근거를 들어 구체적으로 보완하거나 반박하세요. 겉핥기식 동의 대신 수정안과 근거를 충분히 제시하세요. 다른 팀원 이야기는 하지 마세요.';
   }
   function pRound3(q, answers, critique, rebuttals) {
     const a = ORDER.map((k) => '[' + MEMBERS[k].name + '] ' + (answers[k] || '')).join('\n');
     const r = ORDER.filter((k) => rebuttals[k]).map((k) => '[' + MEMBERS[k].name + '] ' + rebuttals[k]).join('\n');
     return '[사용자 질문]\n' + q + '\n\n[1라운드]\n' + a + '\n\n[2라운드 대장 검토]\n' + critique + '\n\n[2라운드 팀원 보완]\n' + (r || '(없음)') +
-      '\n\n[지시]\n이제 최종 답변 초안을 쓰세요. 사용자가 그대로 복사해 쓸 수 있어야 합니다. 아래 형식만 쓰세요.\n\n## 결론\n(한두 문장)\n## 핵심 내용\n1. …\n2. …\n## 실행 순서\n(해당될 때만, 없으면 생략)\n## 출처·근거\n- 확인된 것과 확인이 필요한 것을 구분\n## 주의사항\n- …\n\n규칙: 확인되지 않은 수치·출처를 만들지 말 것. 700~1100자. 팀원 소개나 인사말 없이.';
+      '\n\n[지시]\n이제 최종 답변 초안을 쓰세요. 사용자가 그대로 복사해 쓸 수 있어야 합니다. 아래 형식만 쓰세요.\n\n## 결론\n(핵심 결론을 명확히)\n## 핵심 내용\n1. …\n2. …\n## 실행 순서\n(해당될 때만, 없으면 생략)\n## 출처·근거\n- 확인된 것과 확인이 필요한 것을 구분\n## 주의사항\n- …\n\n규칙: 확인되지 않은 수치·출처를 만들지 말 것. 1~2라운드 토론과 원고의 핵심 근거·수정안이 빠짐없이 담기도록 충분한 분량으로 작성할 것. 팀원 소개나 인사말 없이.';
   }
 
   /* ------------------------------------------------------------------ */
@@ -1642,7 +1642,7 @@ window.AIDJ_DEMO = [
         setStatus('1라운드 · ' + MEMBERS[k].name + ' 작성 중', 'busy');
         const tb = typingBubble(k);
         try {
-          const r = await ask(k, { user: pRound1(promptQ, k), maxTokens: 900, temperature: 0.8 });
+          const r = await ask(k, { user: pRound1(promptQ, k), maxTokens: 2500, temperature: 0.8 });
           tb.remove();
           answers[k] = r.text;
           addMsg({ from: k, text: r.text, round: 1, swap: r.swapped ? r.provider : null });
@@ -1667,7 +1667,7 @@ window.AIDJ_DEMO = [
       {
         const tb = typingBubble('leader');
         try {
-          const r = await ask('leader', { user: pRound2Leader(promptQ, answers), maxTokens: 800, temperature: 0.6 });
+          const r = await ask('leader', { user: pRound2Leader(promptQ, answers), maxTokens: 2000, temperature: 0.6 });
           tb.remove();
           critique = r.text;
           addMsg({ from: 'leader', text: r.text, round: 2, swap: r.swapped ? r.provider : null });
@@ -1685,7 +1685,7 @@ window.AIDJ_DEMO = [
         setStatus('2라운드 · ' + MEMBERS[k].name + ' 보완 중', 'busy');
         const tb = typingBubble(k);
         try {
-          const r = await ask(k, { user: pRound2Member(promptQ, k, answers[k], critique), maxTokens: 500, temperature: 0.7 });
+          const r = await ask(k, { user: pRound2Member(promptQ, k, answers[k], critique), maxTokens: 1500, temperature: 0.7 });
           tb.remove();
           rebuttals[k] = r.text;
           addMsg({ from: k, text: r.text, round: 2, swap: r.swapped ? r.provider : null });
@@ -1707,7 +1707,7 @@ window.AIDJ_DEMO = [
       const tb = typingBubble('leader');
       let finalMsg;
       try {
-        const r = await ask('leader', { user: pRound3(promptQ, answers, critique, rebuttals), maxTokens: 1500, temperature: 0.5 });
+        const r = await ask('leader', { user: pRound3(promptQ, answers, critique, rebuttals), maxTokens: 4000, temperature: 0.5 });
         tb.remove();
         state.lastFinal = r.text;
         finalMsg = addMsg({ from: 'leader', kind: 'final', text: r.text, round: 3, swap: r.swapped ? r.provider : null });
