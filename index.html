@@ -543,7 +543,18 @@ html[data-theme="dark"] [data-mc="gem"]{--mc:#9299E8;--mc-soft:#21233A;--mc-line
       </section>
 
       <section>
-        <h3 class="sec-t">2. 운용 방식</h3>
+        <h3 class="sec-t">2. 무료 AI 자동 전환 <small>클로드 토큰 아끼기</small></h3>
+        <label class="toggle">
+          <input type="checkbox" id="freeModeToggle">
+          <span class="tt">이 앱에서 무료 AI 자동 전환 사용
+            <span class="td">Gemini·Groq·OpenRouter 무료 키를 순서대로 부르고, 한도(429)나 오류가 나면 다음 무료 키로 자동 전환합니다. 아래 [무료 AI 키 풀]은 free-ai-hub와 같은 저장소(han_free_ai_pool_v1)를 쓰므로 한 번만 넣으면 됩니다.</span>
+          </span>
+        </label>
+        <div id="freeAiPool" style="margin-top:.55rem"></div>
+      </section>
+
+      <section>
+        <h3 class="sec-t">3. 운용 방식</h3>
         <label class="toggle">
           <input type="checkbox" id="multiToggle">
           <span class="tt">키가 1개뿐이어도 5명 역할을 한 엔진이 번갈아 대행 (멀티 페르소나)
@@ -581,7 +592,7 @@ html[data-theme="dark"] [data-mc="gem"]{--mc:#9299E8;--mc-soft:#21233A;--mc-line
       </section>
 
       <section>
-        <h3 class="sec-t">3. 고급 <small>잘 모르면 그대로 두세요</small></h3>
+        <h3 class="sec-t">4. 고급 <small>잘 모르면 그대로 두세요</small></h3>
         <details class="adv">
           <summary>모델명 · 중계 서버 주소</summary>
           <div class="adv-body">
@@ -601,7 +612,7 @@ html[data-theme="dark"] [data-mc="gem"]{--mc:#9299E8;--mc-soft:#21233A;--mc-line
       </section>
 
       <section>
-        <h3 class="sec-t">4. 데이터</h3>
+        <h3 class="sec-t">5. 데이터</h3>
         <div class="btn-row" style="display:flex;gap:.45rem;flex-wrap:wrap">
           <button class="btn small" id="clearThread">대화 기록 지우기</button>
           <button class="btn small" id="clearManuals">보관함 비우기</button>
@@ -673,6 +684,616 @@ html[data-theme="dark"] [data-mc="gem"]{--mc:#9299E8;--mc-soft:#21233A;--mc-line
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<!-- FREEAI-CORE:START -->
+<script>
+/* =========================================================================
+   한경동 님 무료 AI 자동 전환 엔진 (Free AI failover core) — v1.0
+   · 저장 위치: localStorage 'han_free_ai_pool_v1'  (free-ai-hub와 공유)
+   · 구조: { version, providers:[{id,type,label,apiKey,model,enabled,priority}],
+             claudeFallbackEnabled, claudeKey, claudeModel }
+   · Gemini · Groq · OpenRouter 무료 키를 순서대로 시도하고 429/오류면 즉시 다음 키로.
+   ========================================================================= */
+(function () {
+  'use strict';
+  if (window.HanFreeAI) return;
+
+  var POOL_KEY = 'han_free_ai_pool_v1';
+  var TYPES = {
+    gemini: { label: 'Google Gemini', short: 'Gemini', model: 'gemini-2.5-flash', hint: 'aistudio.google.com/apikey', ph: 'AIza…' },
+    groq: { label: 'Groq', short: 'Groq', model: 'llama-3.3-70b-versatile', hint: 'console.groq.com/keys', ph: 'gsk_…' },
+    openrouter: { label: 'OpenRouter', short: 'OpenRouter', model: 'meta-llama/llama-3.3-70b-instruct:free', hint: 'openrouter.ai/keys', ph: 'sk-or-…' }
+  };
+  var CLAUDE_MODELS = ['claude-sonnet-5-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5'];
+
+  function err(code, message, extra) {
+    var e = new Error(message);
+    e.code = code;
+    if (extra) for (var k in extra) e[k] = extra[k];
+    return e;
+  }
+  function now() { return Date.now(); }
+  function uid() { return 'f' + now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function clean(s) { return String(s == null ? '' : s).trim(); }
+
+  function blank() {
+    return { version: 1, providers: [], claudeFallbackEnabled: true, claudeKey: '', claudeModel: CLAUDE_MODELS[0], updatedAt: '' };
+  }
+  function normProvider(p, i) {
+    if (!p || typeof p !== 'object') return null;
+    var type = String(p.type || '').toLowerCase();
+    if (!TYPES[type]) return null;
+    var label = clean(p.label) || (TYPES[type].short + ' ' + (i + 1));
+    var pr = Number(p.priority);
+    return {
+      id: clean(p.id) || uid(),
+      type: type,
+      label: label,
+      apiKey: clean(p.apiKey || p.key || ''),
+      model: clean(p.model) || TYPES[type].model,
+      enabled: p.enabled === false ? false : true,
+      priority: isFinite(pr) && pr > 0 ? pr : i + 1,
+      cooldownUntil: Number(p.cooldownUntil) || 0,
+      lastError: clean(p.lastError),
+      lastErrorAt: p.lastErrorAt || '',
+      lastOkAt: p.lastOkAt || ''
+    };
+  }
+  function load() {
+    var pool = blank();
+    var raw = null;
+    try { raw = localStorage.getItem(POOL_KEY); } catch (e) { raw = null; }
+    if (raw) {
+      try {
+        var j = JSON.parse(raw);
+        if (j && typeof j === 'object') {
+          pool = Object.assign(blank(), j);
+        }
+      } catch (e) { /* 깨진 값은 빈 풀로 */ }
+    }
+    var list = Array.isArray(pool.providers) ? pool.providers : [];
+    pool.providers = list.map(normProvider).filter(Boolean);
+    pool.claudeFallbackEnabled = pool.claudeFallbackEnabled !== false;
+    pool.claudeKey = clean(pool.claudeKey);
+    pool.claudeModel = clean(pool.claudeModel) || CLAUDE_MODELS[0];
+    if (!pool.version) pool.version = 1;
+    return pool;
+  }
+  function save(pool) {
+    var cur = {};
+    try { cur = JSON.parse(localStorage.getItem(POOL_KEY) || '{}') || {}; } catch (e) { cur = {}; }
+    var next = Object.assign({}, cur, pool);
+    next.version = next.version || 1;
+    next.updatedAt = new Date().toISOString();
+    next.providers = (next.providers || []).map(function (p) {
+      var o = Object.assign({}, p);
+      delete o.__ui;
+      return o;
+    });
+    try { localStorage.setItem(POOL_KEY, JSON.stringify(next)); } catch (e) { /* 용량 초과 등 */ }
+    return next;
+  }
+  function ordered(pool) {
+    return pool.providers
+      .map(function (p, i) { return { p: p, i: i }; })
+      .filter(function (x) { return x.p.enabled && clean(x.p.apiKey); })
+      .sort(function (a, b) {
+        var pa = Number(a.p.priority) || (a.i + 1), pb = Number(b.p.priority) || (b.i + 1);
+        return pa === pb ? a.i - b.i : pa - pb;
+      })
+      .map(function (x) { return x.p; });
+  }
+  function labelOf(p) { return clean(p.label) || (TYPES[p.type] ? TYPES[p.type].short : '무료 AI'); }
+  function usableCount() { return ordered(load()).length; }
+  function poolSummary() {
+    var pool = load();
+    var all = pool.providers.length;
+    var use = ordered(pool).length;
+    return { all: all, usable: use, claude: !!(clean(pool.claudeKey) && pool.claudeFallbackEnabled) };
+  }
+  function statusKr(code) {
+    return ({ quota: '한도 초과', auth: '키 거부', model: '모델명 오류', net: '연결 실패', server: '서버 오류', empty: '빈 응답', blocked: '요청 거절', parse: '응답 해석 실패', cooldown: '대기 중', nokey: '키 없음' })[code] || '오류';
+  }
+
+  async function requestOne(p, o, timeoutMs) {
+    var type = p.type;
+    var url, headers, body;
+    var maxTokens = o.maxTokens || 1200;
+    var temp = o.temperature == null ? 0.7 : o.temperature;
+    var sys = o.system || '';
+    var user = o.user || '';
+    if (type === 'gemini') {
+      url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(p.model || TYPES.gemini.model) + ':generateContent';
+      headers = { 'Content-Type': 'application/json', 'x-goog-api-key': p.apiKey };
+      body = {
+        systemInstruction: { parts: [{ text: sys }] },
+        contents: [{ role: 'user', parts: [{ text: user }] }],
+        generationConfig: { temperature: temp, maxOutputTokens: maxTokens }
+      };
+    } else if (type === 'groq') {
+      url = 'https://api.groq.com/openai/v1/chat/completions';
+      headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + p.apiKey };
+      body = {
+        model: p.model || TYPES.groq.model, temperature: temp, max_tokens: maxTokens,
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: user }]
+      };
+    } else {
+      url = 'https://openrouter.ai/api/v1/chat/completions';
+      headers = {
+        'Content-Type': 'application/json', 'Authorization': 'Bearer ' + p.apiKey,
+        'HTTP-Referer': (location.origin || 'https://gdhan77-cell.github.io') + '/', 'X-Title': '한경동 AI'
+      };
+      body = {
+        model: p.model || TYPES.openrouter.model, temperature: temp, max_tokens: maxTokens,
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: user }]
+      };
+    }
+
+    var ac = new AbortController();
+    var timedOut = false;
+    var timer = setTimeout(function () { timedOut = true; try { ac.abort(); } catch (e) {} }, timeoutMs || 90000);
+    var res, text;
+    try {
+      res = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body), signal: ac.signal });
+      text = await res.text();
+    } catch (e) {
+      throw err(timedOut ? 'net' : 'net', labelOf(p) + (timedOut ? ' 응답이 너무 늦습니다' : '에 연결하지 못했습니다'));
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) {
+      var detail = text;
+      try { var jj = JSON.parse(text); detail = (jj.error && (jj.error.message || jj.error.status)) || (jj.message) || text; } catch (e) { /* */ }
+      detail = String(detail || '').slice(0, 160);
+      var code = res.status === 429 ? 'quota'
+        : (res.status === 401 || res.status === 403) ? 'auth'
+        : res.status === 404 ? 'model'
+        : res.status >= 500 ? 'server' : 'http';
+      var msg = labelOf(p) + ' ' + statusKr(code) + ' (HTTP ' + res.status + ')' + (detail ? ' · ' + detail : '');
+      throw err(code, msg, { status: res.status, retryAfter: res.headers.get('retry-after') });
+    }
+    var j = null;
+    try { j = JSON.parse(text); } catch (e) { throw err('parse', labelOf(p) + ' 응답을 읽지 못했습니다'); }
+    var out = '';
+    if (type === 'gemini') {
+      var c = j && j.candidates && j.candidates[0];
+      var parts = (c && c.content && c.content.parts) || [];
+      out = parts.map(function (x) { return (x && x.text) || ''; }).join('').trim();
+      if (!out && j && j.promptFeedback && j.promptFeedback.blockReason) {
+        throw err('blocked', labelOf(p) + '가 이 요청을 거절했습니다(' + j.promptFeedback.blockReason + ')');
+      }
+    } else {
+      out = (((j && j.choices && j.choices[0] && j.choices[0].message) || {}).content || '').trim();
+    }
+    if (!out) throw err('empty', labelOf(p) + '가 빈 응답을 보냈습니다');
+    return out;
+  }
+
+  function markOk(pool, p) {
+    for (var i = 0; i < pool.providers.length; i++) {
+      if (pool.providers[i].id === p.id) {
+        pool.providers[i].cooldownUntil = 0;
+        pool.providers[i].lastError = '';
+        pool.providers[i].lastOkAt = new Date().toISOString();
+      }
+    }
+    save(pool);
+  }
+  function markErr(pool, p, e) {
+    var wait = e.code === 'quota' ? 60000 : e.code === 'auth' ? 600000 : e.code === 'net' ? 30000 : 20000;
+    var ra = Number(e.retryAfter);
+    if (e.code === 'quota' && isFinite(ra) && ra > 0) wait = Math.min(ra * 1000, 300000);
+    for (var i = 0; i < pool.providers.length; i++) {
+      if (pool.providers[i].id === p.id) {
+        pool.providers[i].cooldownUntil = now() + wait;
+        pool.providers[i].lastError = statusKr(e.code) + (e.status ? ' (HTTP ' + e.status + ')' : '');
+        pool.providers[i].lastErrorAt = new Date().toISOString();
+      }
+    }
+    save(pool);
+  }
+
+  async function requestClaude(pool, o, model, timeoutMs) {
+    var ac = new AbortController();
+    var timer = setTimeout(function () { try { ac.abort(); } catch (e) {} }, timeoutMs || 120000);
+    var res, text;
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': pool.claudeKey,
+          'anthropic-version': '2026-10-21',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        /* Sonnet 5.5는 temperature 등 샘플링 파라미터를 받으면 400이므로 넣지 않는다. */
+        body: JSON.stringify({
+          model: model,
+          max_tokens: o.maxTokens || 2000,
+          system: o.system || '',
+          messages: [{ role: 'user', content: o.user }]
+        }),
+        signal: ac.signal
+      });
+      text = await res.text();
+    } catch (e) {
+      throw err('net', '클로드에 연결하지 못했습니다');
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) {
+      var detail = text;
+      try { var jj = JSON.parse(text); detail = (jj.error && (jj.error.message || jj.error.type)) || text; } catch (e) { /* */ }
+      detail = String(detail || '').slice(0, 160);
+      var code = res.status === 404 ? 'model'
+        : res.status === 429 ? 'quota'
+        : (res.status === 401 || res.status === 403) ? 'auth'
+        : res.status >= 500 ? 'server' : 'http';
+      throw err(code, '클로드 ' + statusKr(code) + ' (HTTP ' + res.status + ')' + (detail ? ' · ' + detail : ''), { status: res.status });
+    }
+    var j = null;
+    try { j = JSON.parse(text); } catch (e) { throw err('parse', '클로드 응답을 읽지 못했습니다'); }
+    var out = ((j && j.content) || []).filter(function (b) { return b && b.type === 'text'; }).map(function (b) { return b.text; }).join('\n').trim();
+    if (!out) throw err('empty', '클로드가 빈 응답을 보냈습니다');
+    return out;
+  }
+
+  async function callClaude(o) {
+    var pool = load();
+    if (!clean(pool.claudeKey)) throw err('nokey', '클로드 키가 없습니다');
+    var first = clean(pool.claudeModel) || CLAUDE_MODELS[0];
+    var models = [first].concat(CLAUDE_MODELS.filter(function (m) { return m !== first; }));
+    var last = null;
+    for (var i = 0; i < models.length; i++) {
+      try {
+        var text = await requestClaude(pool, o, models[i], o.timeoutMs);
+        return { text: text, provider: 'claude', label: '클로드', type: 'claude', model: models[i], claudeFallback: true };
+      } catch (e) {
+        last = e;
+        if (e.code !== 'model') throw e;
+      }
+    }
+    throw last || err('fail', '클로드 응답을 받지 못했습니다');
+  }
+
+  /* 무료 키들을 순서대로 시도 → 모두 실패하면 (설정 시) 클로드로 보완 */
+  async function call(o) {
+    o = o || {};
+    var pool = load();
+    var list = ordered(pool);
+    var tried = [];
+    var t = now();
+    var ready = list.filter(function (p) { return !(p.cooldownUntil && p.cooldownUntil > t); });
+    var cooling = list.filter(function (p) { return p.cooldownUntil && p.cooldownUntil > t; });
+
+    for (var i = 0; i < ready.length; i++) {
+      var p = ready[i];
+      try {
+        var text = await requestOne(p, o, o.timeoutMs);
+        markOk(pool, p);
+        return { text: text, provider: p.id, label: labelOf(p), type: p.type, tried: tried };
+      } catch (e) {
+        markErr(pool, p, e);
+        tried.push({ label: labelOf(p), status: e.code });
+      }
+    }
+
+    /* 모든 무료 키가 한도 대기 중이면 클로드 보완을 먼저 시도, 없으면 가장 빨리 풀리는 키 하나를 시험 */
+    if (!ready.length && cooling.length) {
+      cooling.sort(function (a, b) { return a.cooldownUntil - b.cooldownUntil; });
+      if (!(o.allowClaude !== false && pool.claudeFallbackEnabled && clean(pool.claudeKey))) {
+        var c = cooling[0];
+        try {
+          var t2 = await requestOne(c, o, o.timeoutMs);
+          markOk(pool, c);
+          return { text: t2, provider: c.id, label: labelOf(c), type: c.type, tried: tried };
+        } catch (e2) {
+          markErr(pool, c, e2);
+          tried.push({ label: labelOf(c), status: e2.code });
+        }
+      }
+      cooling.forEach(function (x) { tried.push({ label: labelOf(x), status: 'cooldown' }); });
+    }
+
+    if (o.allowClaude !== false && pool.claudeFallbackEnabled && clean(pool.claudeKey)) {
+      var r = await callClaude(o);
+      r.tried = tried;
+      return r;
+    }
+
+    if (!list.length) {
+      throw err('nofree', '무료 AI 키가 없습니다. 설정에서 Gemini·Groq·OpenRouter 키를 넣어 주세요.');
+    }
+    var detail = tried.filter(function (x) { return x.status !== 'cooldown'; })
+      .map(function (x) { return x.label + '(' + statusKr(x.status) + ')'; }).join(', ');
+    throw err('allfail', '무료 AI가 모두 응답하지 못했습니다.' + (detail ? ' — ' + detail : ''));
+  }
+
+  async function testProvider(p) {
+    var pp = normProvider(Object.assign({}, p, { enabled: true }), 0);
+    if (!clean(pp.apiKey)) return { ok: false, message: '키를 입력하세요' };
+    var t0 = now();
+    try {
+      var out = await requestOne(pp, {
+        system: '너는 연결 확인용 도우미다. 아주 짧게 답한다.',
+        user: '"연결됨"이라고만 답하세요.',
+        maxTokens: 24, temperature: 0, timeoutMs: 30000
+      });
+      return { ok: true, message: '정상 ✓ ' + String(out).slice(0, 16), ms: now() - t0 };
+    } catch (e) {
+      return { ok: false, message: String(e.message || e.code || '오류').slice(0, 120), ms: now() - t0 };
+    }
+  }
+
+  async function testClaude(key, model) {
+    var pool = load();
+    pool.claudeKey = clean(key);
+    pool.claudeModel = clean(model) || CLAUDE_MODELS[0];
+    if (!pool.claudeKey) return { ok: false, message: '클로드 키를 입력하세요' };
+    try {
+      var r = await callClaude({ system: '짧게 답한다.', user: '"연결됨"이라고만 답하세요.', maxTokens: 24, timeoutMs: 30000 });
+      return { ok: true, message: '정상 ✓ ' + r.model, model: r.model };
+    } catch (e) {
+      return { ok: false, message: String(e.message || e.code) };
+    }
+  }
+
+  /* ---------------- 설정 화면 UI ---------------- */
+  var CSS_ID = 'hfa-style';
+  function injectCss() {
+    if (document.getElementById(CSS_ID)) return;
+    var st = document.createElement('style');
+    st.id = CSS_ID;
+    st.textContent = [
+      '.hfa{border:1px solid rgba(120,100,70,.28);border-radius:12px;padding:.7rem .75rem;background:rgba(255,252,245,.6);max-width:100%;min-width:0;overflow:hidden}',
+      '.hfa *{box-sizing:border-box}',
+      '.hfa-head{display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem}',
+      '.hfa-head b{font-size:.86rem}',
+      '.hfa-count{font-size:.7rem;opacity:.72}',
+      '.hfa-note{font-size:.7rem;line-height:1.5;opacity:.78;margin:.1rem 0 .55rem}',
+      '.hfa-note code{font-size:.68rem;padding:0 .2rem;border-radius:4px;background:rgba(120,100,70,.12)}',
+      '.hfa-rows{display:flex;flex-direction:column;gap:.4rem;min-width:0}',
+      '.hfa-row{display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;padding:.4rem;border:1px solid rgba(120,100,70,.2);border-radius:9px;background:rgba(255,255,255,.5);min-width:0;max-width:100%}',
+      '.hfa-row input{min-width:0;max-width:100%}',
+      '.hfa-row input[data-f=\"label\"]{flex:1 1 4.6rem;width:auto}',
+      '.hfa-row.off{opacity:.55}',
+      '.hfa-row input[type=text],.hfa-row input[type=password]{width:100%;min-width:0;font-size:.72rem;padding:.28rem .35rem;border:1px solid rgba(120,100,70,.35);border-radius:6px;background:#fff;color:inherit}',
+      '.hfa-type{font-size:.66rem;font-weight:700;padding:.18rem .34rem;border-radius:5px;background:rgba(120,100,70,.14);white-space:nowrap;flex:0 0 auto}',
+      '.hfa-en{display:flex;align-items:center;gap:.2rem;font-size:.66rem;white-space:nowrap}',
+      '.hfa-keyw{display:flex;gap:.2rem;min-width:0;flex:2 1 7rem}',
+      '.hfa-row input[data-f=\"model\"]{flex:1 1 6rem;width:auto}',
+      '.hfa-acts{display:flex;gap:.15rem;flex-wrap:nowrap;margin-left:auto}',
+      '.hfa-acts button{font-size:.66rem;padding:.24rem .34rem;border:1px solid rgba(120,100,70,.35);border-radius:6px;background:rgba(255,255,255,.85);color:inherit;cursor:pointer;line-height:1.2;white-space:nowrap}',
+      '.hfa-acts button:hover{background:rgba(120,100,70,.12)}',
+      '.hfa-msg{flex:1 0 100%;font-size:.68rem;line-height:1.4}',
+      '.hfa-msg.ok{color:#1d7a4a}.hfa-msg.err{color:#b3382c}',
+      '.hfa-add{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.5rem}',
+      '.hfa-add button{font-size:.7rem;padding:.3rem .5rem;border:1px dashed rgba(120,100,70,.45);border-radius:7px;background:transparent;color:inherit;cursor:pointer}',
+      '.hfa-claude{margin-top:.6rem;padding-top:.55rem;border-top:1px dashed rgba(120,100,70,.3)}',
+      '.hfa-claude label{display:flex;gap:.35rem;align-items:flex-start;font-size:.72rem;line-height:1.45}',
+      '.hfa-crow{display:grid;grid-template-columns:minmax(7rem,1.6fr) minmax(6rem,1fr) auto;gap:.3rem;margin-top:.35rem}',
+      '.hfa-crow input{width:100%;min-width:0;font-size:.72rem;padding:.28rem .35rem;border:1px solid rgba(120,100,70,.35);border-radius:6px;background:#fff;color:inherit}',
+      '.hfa-crow button{font-size:.68rem;padding:.26rem .45rem;border:1px solid rgba(120,100,70,.35);border-radius:6px;background:rgba(255,255,255,.85);color:inherit;cursor:pointer}',
+      '.hfa-empty{font-size:.7rem;opacity:.7;padding:.35rem .1rem}',
+      '@media(max-width:620px){.hfa-keyw,.hfa-row input[data-f=\"model\"]{flex:1 0 100%}.hfa-acts{flex:1 0 100%;justify-content:flex-end;margin-left:0}.hfa-crow{grid-template-columns:1fr}.hfa-crow button{justify-self:start}}'
+    ].join('\n');
+    (document.head || document.documentElement).appendChild(st);
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function mount(el, opts) {
+    if (!el) return null;
+    opts = opts || {};
+    injectCss();
+    var ui = { el: el, shown: {} };
+
+    function persist(pool) { save(pool); if (typeof opts.onChange === 'function') opts.onChange(pool); }
+
+    function render() {
+      var pool = load();
+      var use = ordered(pool);
+      var html = '';
+      html += '<div class="hfa-head"><b>무료 AI 키 풀</b><span class="hfa-count">사용 가능 ' + use.length + '개 · 등록 ' + pool.providers.length + '개</span></div>';
+      html += '<p class="hfa-note">Gemini·Groq·OpenRouter 무료 키를 여러 개 넣어 두면, 한도(429)나 오류가 난 키는 건너뛰고 <b>다음 키로 자동 전환</b>합니다. 이 키 묶음은 이 브라우저의 <code>han_free_ai_pool_v1</code>에 저장되어 <b>free-ai-hub</b>와 같은 주소의 다른 앱이 함께 씁니다.' +
+        (use.length ? '' : ' <b>아직 쓸 수 있는 무료 키가 없습니다.</b>') + '</p>';
+
+      html += '<div class="hfa-rows">';
+      if (!pool.providers.length) {
+        html += '<div class="hfa-empty">아래 [+ Gemini] 같은 버튼으로 무료 키를 추가하세요. 키 발급: ' +
+          '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini</a> · ' +
+          '<a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a> · ' +
+          '<a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter</a></div>';
+      }
+      pool.providers.forEach(function (p, i) {
+        var T = TYPES[p.type];
+        var stateMsg = '';
+        if (p.cooldownUntil && p.cooldownUntil > now()) {
+          stateMsg = '<div class="hfa-msg err">한도·오류로 ' + Math.ceil((p.cooldownUntil - now()) / 1000) + '초 뒤 다시 시도합니다 · ' + esc(p.lastError || '') + '</div>';
+        } else if (p.lastError) {
+          stateMsg = '<div class="hfa-msg err">최근 오류: ' + esc(p.lastError) + '</div>';
+        }
+        html += '<div class="hfa-row' + (p.enabled ? '' : ' off') + '" data-id="' + esc(p.id) + '">' +
+          '<label class="hfa-en"><input type="checkbox" data-f="enabled"' + (p.enabled ? ' checked' : '') + '> 사용</label>' +
+          '<span class="hfa-type">' + esc(T.short) + '</span>' +
+          '<input type="text" data-f="label" value="' + esc(p.label) + '" aria-label="키 이름">' +
+          '<div class="hfa-keyw"><input type="password" data-f="apiKey" value="' + esc(p.apiKey) + '" placeholder="' + esc(T.ph) + '" autocomplete="off" spellcheck="false" aria-label="API 키"><button type="button" data-a="eye" title="보기">👁</button></div>' +
+          '<input class="hfa-modelin" type="text" data-f="model" value="' + esc(p.model) + '" aria-label="모델명">' +
+          '<div class="hfa-acts">' +
+            '<button type="button" data-a="test">테스트</button>' +
+            '<button type="button" data-a="up" title="위로"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
+            '<button type="button" data-a="down" title="아래로"' + (i === pool.providers.length - 1 ? ' disabled' : '') + '>↓</button>' +
+            '<button type="button" data-a="del" title="삭제">✕</button>' +
+          '</div>' +
+          '<div class="hfa-msg" data-msg></div>' +
+          (stateMsg ? stateMsg : '') +
+        '</div>';
+      });
+      html += '</div>';
+
+      html += '<div class="hfa-add">' +
+        '<button type="button" data-add="gemini">+ Gemini</button>' +
+        '<button type="button" data-add="groq">+ Groq</button>' +
+        '<button type="button" data-add="openrouter">+ OpenRouter</button>' +
+        '</div>';
+
+      html += '<div class="hfa-claude">' +
+        '<label><input type="checkbox" data-c="fallback"' + (pool.claudeFallbackEnabled ? ' checked' : '') + '>' +
+        '<span>무료 AI가 모두 한도 초과일 때만 내 클로드 키로 자동 보완 <span style="opacity:.7">(체크를 풀면 100% 무료 AI만 순환)</span></span></label>' +
+        '<div class="hfa-crow">' +
+          '<input type="password" data-c="key" value="' + esc(pool.claudeKey) + '" placeholder="클로드 키 sk-ant-… (선택)" autocomplete="off" spellcheck="false" aria-label="클로드 API 키">' +
+          '<input type="text" data-c="model" value="' + esc(pool.claudeModel) + '" spellcheck="false" aria-label="클로드 모델">' +
+          '<button type="button" data-c="test">클로드 확인</button>' +
+        '</div>' +
+        '<div class="hfa-msg" data-cmsg></div>' +
+      '</div>';
+      el.innerHTML = html;
+    }
+
+    function poolMutate(fn) {
+      var pool = load();
+      fn(pool);
+      persist(pool);
+      render();
+    }
+
+    el.addEventListener('click', async function (ev) {
+      var btn = ev.target.closest('button');
+      if (!btn || !el.contains(btn)) return;
+      var row = btn.closest('.hfa-row');
+      var add = btn.getAttribute('data-add');
+      if (add) {
+        var type = add;
+        poolMutate(function (pool) {
+          var n = pool.providers.filter(function (x) { return x.type === type; }).length + 1;
+          pool.providers.push({
+            id: uid(), type: type, label: TYPES[type].short + ' ' + n, apiKey: '',
+            model: TYPES[type].model, enabled: true, priority: pool.providers.length + 1
+          });
+        });
+        return;
+      }
+      var c = btn.getAttribute('data-c');
+      if (c === 'test') {
+        var keyEl = el.querySelector('[data-c="key"]');
+        var modelEl = el.querySelector('[data-c="model"]');
+        var msg = el.querySelector('[data-cmsg]');
+        btn.disabled = true; var old = btn.textContent; btn.textContent = '확인 중…';
+        var r = await testClaude(keyEl.value, modelEl.value);
+        btn.disabled = false; btn.textContent = old;
+        if (msg) { msg.className = 'hfa-msg ' + (r.ok ? 'ok' : 'err'); msg.textContent = r.message; }
+        if (r.ok) {
+          poolMutate(function (pool) { pool.claudeKey = clean(keyEl.value); pool.claudeModel = r.model || clean(modelEl.value); });
+        }
+        return;
+      }
+      if (!row) return;
+      var id = row.getAttribute('data-id');
+      var a = btn.getAttribute('data-a');
+      if (a === 'eye') {
+        var inp = row.querySelector('[data-f="apiKey"]');
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        return;
+      }
+      if (a === 'del') {
+        poolMutate(function (pool) { pool.providers = pool.providers.filter(function (x) { return x.id !== id; }); });
+        return;
+      }
+      if (a === 'up' || a === 'down') {
+        poolMutate(function (pool) {
+          var i = pool.providers.findIndex(function (x) { return x.id === id; });
+          var j = a === 'up' ? i - 1 : i + 1;
+          if (i < 0 || j < 0 || j >= pool.providers.length) return;
+          var tmp = pool.providers[i]; pool.providers[i] = pool.providers[j]; pool.providers[j] = tmp;
+          pool.providers.forEach(function (x, k) { x.priority = k + 1; });
+        });
+        return;
+      }
+      if (a === 'test') {
+        var p = load().providers.find(function (x) { return x.id === id; });
+        if (!p) return;
+        p.apiKey = clean(row.querySelector('[data-f="apiKey"]').value);
+        p.model = clean(row.querySelector('[data-f="model"]').value) || TYPES[p.type].model;
+        var m = row.querySelector('[data-msg]');
+        btn.disabled = true; btn.textContent = '확인 중…';
+        var res = await testProvider(p);
+        btn.disabled = false; btn.textContent = '테스트';
+        if (m) { m.className = 'hfa-msg ' + (res.ok ? 'ok' : 'err'); m.textContent = res.message; }
+        if (res.ok) poolMutate(function (pool) {
+          var t = pool.providers.find(function (x) { return x.id === id; });
+          if (t) { t.lastError = ''; t.cooldownUntil = 0; t.lastOkAt = new Date().toISOString(); }
+        });
+        return;
+      }
+    });
+
+    el.addEventListener('input', function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var row = t.closest('.hfa-row');
+      var f = t.getAttribute('data-f');
+      var c = t.getAttribute('data-c');
+      clearTimeout(ui.timer);
+      ui.timer = setTimeout(function () {
+        var pool = load();
+        if (row && f) {
+          var id = row.getAttribute('data-id');
+          var p = pool.providers.find(function (x) { return x.id === id; });
+          if (!p) return;
+          if (f === 'apiKey') p.apiKey = clean(t.value);
+          else if (f === 'label') p.label = clean(t.value);
+          else if (f === 'model') p.model = clean(t.value);
+        } else if (c === 'key') pool.claudeKey = clean(t.value);
+        else if (c === 'model') pool.claudeModel = clean(t.value) || CLAUDE_MODELS[0];
+        persist(pool);
+      }, 450);
+    });
+    el.addEventListener('change', function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var row = t.closest('.hfa-row');
+      var f = t.getAttribute('data-f');
+      var c = t.getAttribute('data-c');
+      if (row && f === 'enabled') {
+        var id = row.getAttribute('data-id');
+        poolMutate(function (pool) {
+          var p = pool.providers.find(function (x) { return x.id === id; });
+          if (p) p.enabled = !!t.checked;
+        });
+      } else if (c === 'fallback') {
+        poolMutate(function (pool) { pool.claudeFallbackEnabled = !!t.checked; });
+      }
+    });
+
+    render();
+    ui.refresh = render;
+    window.addEventListener('storage', function (e) { if (e.key === POOL_KEY) render(); });
+    return ui;
+  }
+
+  window.HanFreeAI = {
+    KEY: POOL_KEY,
+    TYPES: TYPES,
+    CLAUDE_MODELS: CLAUDE_MODELS,
+    load: load,
+    save: save,
+    blank: blank,
+    call: call,
+    callClaude: callClaude,
+    testProvider: testProvider,
+    testClaude: testClaude,
+    usableCount: usableCount,
+    poolSummary: poolSummary,
+    mount: mount,
+    statusKr: statusKr
+  };
+})();
+
+</script>
+<!-- FREEAI-CORE:END -->
 <script>/* 데모 시나리오 — 실제 AI 응답이 아닌 예시 대화 */
 window.AIDJ_DEMO = [
 {
@@ -987,7 +1608,7 @@ window.AIDJ_DEMO = [
   const DEFAULTS = {
     keys: { anthropic: '', openai: '', gemini: '', perplexity: '' },
     models: {
-      anthropic: 'claude-sonnet-4-5',
+      anthropic: 'claude-sonnet-5-5',
       openai: 'gpt-4o-mini',
       gemini: 'gemini-2.5-flash',
       perplexity: 'sonar'
@@ -996,6 +1617,7 @@ window.AIDJ_DEMO = [
     delegateEngine: 'auto',
     yeonjiEngine: 'auto',
     autoFallback: true,
+    engineMode: 'auto',
     proxy: '',
     theme: 'light',
     scale: 1,
@@ -1115,9 +1737,15 @@ window.AIDJ_DEMO = [
   };
   if (!Array.isArray(state.thread)) state.thread = [];
   if (!Array.isArray(state.manuals)) state.manuals = [];
+  /* 2026-11-30 claude-sonnet-4-5 은퇴 → 저장된 모델명을 최신으로 이전 */
+  if (state.settings.models && (!state.settings.models.anthropic || state.settings.models.anthropic === 'claude-sonnet-4-5')) {
+    state.settings.models.anthropic = 'claude-sonnet-5-5';
+  }
+  if (state.settings.engineMode !== 'free') state.settings.engineMode = 'auto';
 
   const chat = $('chat'), input = $('input'), toastEl = $('toast');
   let autoScroll = true;
+  let poolUI = null;
 
   /* ------------------------------------------------------------------ */
   /* 테마 · 글자 크기                                                     */
@@ -1169,7 +1797,7 @@ window.AIDJ_DEMO = [
     const h = { 'Content-Type': 'application/json' };
     if (prov === 'anthropic') {
       h['x-api-key'] = key;
-      h['anthropic-version'] = '2023-06-01';
+      h['anthropic-version'] = '2026-10-21';
       h['anthropic-dangerous-direct-browser-access'] = 'true';
    } else if (prov === 'gemini') {
       h['x-goog-api-key'] = key;
@@ -1179,13 +1807,23 @@ window.AIDJ_DEMO = [
     return h;
   }
 
-  function bodyOf(prov, system, user, maxTokens, temperature) {
+  /* 클로드 모델 목록 — 새 모델이 계정에서 안 되면(404) 다음 후보로 자동 재시도 */
+  function claudeModels() {
+    const first = ((state.settings.models.anthropic || '') + '').trim();
+    const list = [];
+    [first].concat(['claude-sonnet-5-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5']).forEach((m) => {
+      if (m && list.indexOf(m) < 0) list.push(m);
+    });
+    return list;
+  }
+
+  function bodyOf(prov, system, user, maxTokens, temperature, modelOverride) {
     const s = state.settings;
     if (prov === 'anthropic') {
+      /* Sonnet 5.5는 temperature 등 샘플링 파라미터를 받으면 400이므로 넣지 않는다. */
       return {
-        model: s.models.anthropic || DEFAULTS.models.anthropic,
+        model: modelOverride || s.models.anthropic || DEFAULTS.models.anthropic,
         max_tokens: maxTokens,
-        temperature: temperature,
         system: system,
         messages: [{ role: 'user', content: user }]
       };
@@ -1228,8 +1866,8 @@ window.AIDJ_DEMO = [
     if (state.ctrl) state.ctrl.signal.addEventListener('abort', onCancel, { once: true });
     const timer = setTimeout(() => { timedOut = true; try { ac.abort(); } catch (e) {} }, opts.timeoutMs || 120000);
 
-    const attempt = async () => {
-      const body = bodyOf(prov, opts.system || '', opts.user, opts.maxTokens || 1000, opts.temperature == null ? 0.75 : opts.temperature);
+    const attemptOnce = async (model) => {
+      const body = bodyOf(prov, opts.system || '', opts.user, opts.maxTokens || 1000, opts.temperature == null ? 0.75 : opts.temperature, model);
       let res;
       try {
         res = await fetch(endpointOf(prov), {
@@ -1272,6 +1910,20 @@ window.AIDJ_DEMO = [
       return out;
     };
 
+    /* 클로드는 모델명이 계정에서 안 되면(404) 다음 후보 모델로 넘어간다. */
+    const attempt = async () => {
+      const models = prov === 'anthropic' ? claudeModels() : [null];
+      let lastErr = null;
+      for (let i = 0; i < models.length; i++) {
+        try { return await attemptOnce(models[i]); }
+        catch (e) {
+          lastErr = e;
+          if (e.code !== 'model' || e.code === 'cancel') throw e;
+        }
+      }
+      throw lastErr;
+    };
+
     try {
       let waitMs = 2000;
       for (let retry = 0; retry < 4; retry++) {
@@ -1297,6 +1949,13 @@ window.AIDJ_DEMO = [
 
   function available() { return ['anthropic', 'openai', 'gemini', 'perplexity'].filter((p) => (state.settings.keys[p] || '').trim()); }
 
+  /* 무료 AI 키 풀(han_free_ai_pool_v1) 상태 */
+  function freeStats() {
+    try { return window.HanFreeAI ? HanFreeAI.poolSummary() : { all: 0, usable: 0, claude: false }; }
+    catch (e) { return { all: 0, usable: 0, claude: false }; }
+  }
+  function freeReady() { const f = freeStats(); return f.usable > 0 || f.claude; }
+
   function autoDelegate() {
     const a = available();
     for (const p of ['gemini', 'openai', 'anthropic', 'perplexity']) if (a.indexOf(p) >= 0) return p;
@@ -1304,6 +1963,7 @@ window.AIDJ_DEMO = [
   }
 
   function decideMode() {
+    if (state.settings.engineMode === 'free') return freeReady() ? 'free' : 'demo';
     const a = available();
     if (!a.length) return 'demo';
     if (a.length >= 4) return 'full';
@@ -1328,11 +1988,21 @@ window.AIDJ_DEMO = [
   }
 
   async function ask(member, opts) {
-    const multi = state.mode === 'multi';
+    const multi = state.mode === 'multi' || state.mode === 'free';
     const system = SYS[member] + (multi
       ? '\n\n[중요] 지금은 한 엔진이 팀의 다섯 역할을 번갈아 수행하고 있다. 너는 오직 ' + MEMBERS[member].name + ' 한 사람으로서만 말한다. 다른 역할의 말투를 흉내 내지 말고 자기 역할 범위 안에서 답한다.'
       : '');
     const common = { system, user: opts.user, maxTokens: opts.maxTokens || 900, temperature: opts.temperature == null ? 0.75 : opts.temperature };
+
+    if (state.mode === 'free') {
+      if (!window.HanFreeAI) throw AppError('nokey', '무료 AI 엔진을 불러오지 못했습니다. 페이지를 새로고침해 주세요.');
+      try {
+        const r = await HanFreeAI.call(common);
+        return { text: r.text, provider: r.provider, swapped: false, via: r.label, viaType: r.type };
+      } catch (e) {
+        throw AppError(e.code === 'nofree' || e.code === 'allfail' ? 'nokey' : (e.code || 'fail'), e.message);
+      }
+    }
 
     if (multi) {
       const p = state.delegateProvider;
@@ -1431,6 +2101,7 @@ window.AIDJ_DEMO = [
     let s = '<span class="name">' + esc(m.name) + '</span><span class="tag">' + esc(m.role) + '</span>';
     if (o.demo) s += '<span class="dmtag">데모</span>';
     if (o.swap) s += '<span class="swap">대체 엔진 ' + esc(PROV[o.swap].label) + '</span>';
+    if (o.via) s += '<span class="swap">무료 AI · ' + esc(o.via) + '</span>';
     s += '<span class="time">' + esc(nowTime(o.t)) + '</span>';
     return s;
   }
@@ -1469,7 +2140,7 @@ window.AIDJ_DEMO = [
     scrollDown();
 
     if (o.store !== false) {
-      state.thread.push({ from: from, kind: o.kind || 'text', text: o.text, round: o.round || 0, demo: !!o.demo, swap: o.swap || null, t: o.t || Date.now(), qid: o.qid || state.qid, files: (Array.isArray(o.files) && o.files.length) ? o.files : null });
+      state.thread.push({ from: from, kind: o.kind || 'text', text: o.text, round: o.round || 0, demo: !!o.demo, swap: o.swap || null, via: o.via || null, t: o.t || Date.now(), qid: o.qid || state.qid, files: (Array.isArray(o.files) && o.files.length) ? o.files : null });
       saveJSON(LS.thread, state.thread);
     }
     return el;
@@ -1530,8 +2201,13 @@ window.AIDJ_DEMO = [
     const a = available();
     const mode = decideMode();
     const note = $('modeNote');
-    if (mode === 'demo') {
-      note.textContent = '키 없음 · 데모만 가능 · ⚙️ 설정에서 키를 넣으세요';
+    if (mode === 'free') {
+      const f = freeStats();
+      note.textContent = '무료 AI 자동 전환 · 사용 가능 키 ' + f.usable + '개' + (f.claude ? ' · 클로드 보완 켜짐' : ' · 클로드 보완 없음');
+    } else if (mode === 'demo') {
+      note.textContent = state.settings.engineMode === 'free'
+        ? '무료 AI 키가 없습니다 · ⚙️ 설정에서 무료 키를 넣거나 클로드 보완을 켜세요'
+        : '키 없음 · 데모만 가능 · ⚙️ 설정에서 키를 넣으세요';
     } else if (mode === 'multi') {
       const p = state.settings.delegateEngine !== 'auto' && a.indexOf(state.settings.delegateEngine) >= 0 ? state.settings.delegateEngine : autoDelegate();
       note.textContent = '대행 모드 · ' + PROV[p].label + ' 1개 엔진이 5역할을 맡습니다.';
@@ -1625,6 +2301,10 @@ window.AIDJ_DEMO = [
         ? state.settings.delegateEngine : autoDelegate();
       addSys('한 엔진(' + PROV[state.delegateProvider].label + ')이 다섯 역할을 번갈아 대행합니다. 설정에서 4개 키를 넣으면 회사별 엔진으로 나뉩니다.');
     }
+    if (state.mode === 'free') {
+      const f = freeStats();
+      addSys('무료 AI 자동 전환 — 무료 키 ' + f.usable + '개를 순서대로 시도하고, 한도·오류가 나면 다음 키로 넘어갑니다.' + (f.claude ? ' 모두 막히면 클로드로 보완합니다.' : ' (클로드 보완 꺼짐)'));
+    }
 
     const answers = {};
     const rebuttals = {};
@@ -1645,7 +2325,7 @@ window.AIDJ_DEMO = [
           const r = await ask(k, { user: pRound1(promptQ, k), maxTokens: 2500, temperature: 0.8 });
           tb.remove();
           answers[k] = r.text;
-          addMsg({ from: k, text: r.text, round: 1, swap: r.swapped ? r.provider : null });
+          addMsg({ from: k, text: r.text, round: 1, swap: r.swapped ? r.provider : null, via: r.via || null });
           setMemberState(k, 'done');
         } catch (e) {
           tb.remove();
@@ -1670,7 +2350,7 @@ window.AIDJ_DEMO = [
           const r = await ask('leader', { user: pRound2Leader(promptQ, answers), maxTokens: 2000, temperature: 0.6 });
           tb.remove();
           critique = r.text;
-          addMsg({ from: 'leader', text: r.text, round: 2, swap: r.swapped ? r.provider : null });
+          addMsg({ from: 'leader', text: r.text, round: 2, swap: r.swapped ? r.provider : null, via: r.via || null });
           setMemberState('leader', 'done');
         } catch (e) {
           tb.remove();
@@ -1688,7 +2368,7 @@ window.AIDJ_DEMO = [
           const r = await ask(k, { user: pRound2Member(promptQ, k, answers[k], critique), maxTokens: 1500, temperature: 0.7 });
           tb.remove();
           rebuttals[k] = r.text;
-          addMsg({ from: k, text: r.text, round: 2, swap: r.swapped ? r.provider : null });
+          addMsg({ from: k, text: r.text, round: 2, swap: r.swapped ? r.provider : null, via: r.via || null });
           setMemberState(k, 'done');
         } catch (e) {
           tb.remove();
@@ -1710,7 +2390,7 @@ window.AIDJ_DEMO = [
         const r = await ask('leader', { user: pRound3(promptQ, answers, critique, rebuttals), maxTokens: 4000, temperature: 0.5 });
         tb.remove();
         state.lastFinal = r.text;
-        finalMsg = addMsg({ from: 'leader', kind: 'final', text: r.text, round: 3, swap: r.swapped ? r.provider : null });
+        finalMsg = addMsg({ from: 'leader', kind: 'final', text: r.text, round: 3, swap: r.swapped ? r.provider : null, via: r.via || null });
         setMemberState('leader', 'done');
       } catch (e) {
         tb.remove();
@@ -1994,6 +2674,8 @@ window.AIDJ_DEMO = [
     });
     $('multiToggle').checked = !!s.multiPersona;
     $('fallbackToggle').checked = !!s.autoFallback;
+    $('freeModeToggle').checked = s.engineMode === 'free';
+    if (poolUI && poolUI.refresh) poolUI.refresh();
     $('delegateSel').value = s.delegateEngine || 'auto';
     $('yeonjiSel').value = s.yeonjiEngine || 'auto';
     $('proxyInput').value = s.proxy || '';
@@ -2026,9 +2708,9 @@ window.AIDJ_DEMO = [
     ['anthropic', 'openai', 'gemini', 'perplexity'].forEach((p) => {
       s.keys[p] = ($('key_' + p).value || '').trim();
       s.models[p] = (($('model_' + p).value || '').trim()) || DEFAULTS.models[p];
-    });
-    s.multiPersona = $('multiToggle').checked;
+    });    s.multiPersona = $('multiToggle').checked;
     s.autoFallback = $('fallbackToggle').checked;
+    s.engineMode = $('freeModeToggle').checked ? 'free' : 'auto';
     s.delegateEngine = $('delegateSel').value;
     s.yeonjiEngine = $('yeonjiSel').value;
     s.proxy = ($('proxyInput').value || '').trim();
@@ -2041,6 +2723,10 @@ window.AIDJ_DEMO = [
   }
   function modeSummary() {
     const m = decideMode();
+    if (m === 'free') {
+      const f = freeStats();
+      return '무료 AI 자동 전환 (무료 키 ' + f.usable + '개' + (f.claude ? ' · 클로드 보완' : '') + ')';
+    }
     if (m === 'full') return '4개 엔진 모드';
     if (m === 'multi') {
       const a = available();
@@ -2470,6 +3156,7 @@ window.AIDJ_DEMO = [
     renderAttachments();
     refreshModeNote();
     bind();
+    try { poolUI = window.HanFreeAI ? HanFreeAI.mount($('freeAiPool'), { onChange: function () { refreshModeNote(); } }) : null; } catch (e) { poolUI = null; }
     renderThread();
     if (state.thread.length) {
       const last = state.thread.filter((m) => m.from === 'me').pop();
