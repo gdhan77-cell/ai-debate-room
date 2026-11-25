@@ -2820,6 +2820,22 @@ window.AIDJ_DEMO = [
   /* ------------------------------------------------------------------ */
   /* 설정                                                                */
   /* ------------------------------------------------------------------ */
+  /* 무료 키 풀(그록·오픈라우터)과 위 입력칸을 맞춘다 — 지금 입력 중인 칸은 건드리지 않는다. */
+  function syncFreeKeyRows() {
+    if (!window.HanFreeAI) return;
+    ['groq', 'openrouter'].forEach((p) => {
+      const el = $('key_' + p);
+      if (!el || document.activeElement === el) return;
+      const v = HanFreeAI.keyOf(p);
+      if (el.value !== v) el.value = v;
+      const st = $('st_' + p);
+      if (st) {
+        st.textContent = v ? '무료 키 풀에 저장됨' : '없음';
+        st.style.color = v ? 'var(--ok)' : 'var(--ink3)';
+      }
+    });
+  }
+
   function openSettings() {
     const s = state.settings;
     ['anthropic', 'openai', 'gemini', 'perplexity'].forEach((p) => {
@@ -3366,7 +3382,7 @@ window.AIDJ_DEMO = [
     renderAttachments();
     refreshModeNote();
     bind();
-    try { poolUI = window.HanFreeAI ? HanFreeAI.mount($('freeAiPool'), { onChange: function () { refreshModeNote(); } }) : null; } catch (e) { poolUI = null; }
+    try { poolUI = window.HanFreeAI ? HanFreeAI.mount($('freeAiPool'), { onChange: function () { refreshModeNote(); syncFreeKeyRows(); } }) : null; } catch (e) { poolUI = null; }
     renderThread();
     if (state.thread.length) {
       const last = state.thread.filter((m) => m.from === 'me').pop();
