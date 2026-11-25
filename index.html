@@ -1796,6 +1796,10 @@ window.AIDJ_DEMO = [
   if (state.settings.models && (!state.settings.models.anthropic || state.settings.models.anthropic === 'claude-sonnet-4-5')) {
     state.settings.models.anthropic = 'claude-sonnet-5-5';
   }
+  /* 2026-11-25 gemini-2.5-flash 계열 종료(404) → 저장된 모델명을 최신으로 이전 */
+  if (state.settings.models && ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'].indexOf(state.settings.models.gemini) >= 0) {
+    state.settings.models.gemini = 'gemini-3.5-flash';
+  }
   if (state.settings.engineMode !== 'free') state.settings.engineMode = 'auto';
 
   const chat = $('chat'), input = $('input'), toastEl = $('toast');
